@@ -97,12 +97,18 @@ const importCourses = async (req, res) => {
         const coursesData = processExcelFile(req.file.buffer);
 
         await Course.deleteMany({});
-        const insertedCourses = await Course.insertMany(coursesData);
+
+        // sending 200-300 courses directly to the frontend isn't a good thing i think
+        // i am commenting this and i have written seperate route for getCourses with 
+        // pagination hope this works
+        // const insertedCourses = await Course.insertMany(coursesData);
+
+        await Course.insertMany(coursesData);
 
         return res.status(200).json({
             success: true,
             message: 'Courses imported successfully',
-            data: insertedCourses
+            data: null // we may send top 10 files here as well but i prefer getCourses at least for now
         });
     }
     catch (error) {
@@ -114,6 +120,45 @@ const importCourses = async (req, res) => {
     }
 };
 
+const getCourses = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page);
+        const limit = parseInt(req.query.limit);
+        const skip = (page - 1) * limit;
+
+        const courses = await Course.find().sort({ subject: 1 }).skip(skip).limit(limit).lean();
+        
+        const totalCourses = await Course.countDocuments();
+        const totalPages = Math.ceil(totalCourses / limit);
+
+        if (!courses) {
+            return res.status(404).json({
+                success: false,
+                message: "courses not found!",
+                data: null
+            })
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Courses Fetched successfully",
+            page: page,
+            totalPages,
+            data: courses
+        })
+
+    } catch (e) {
+        console.log(e.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching courses! Please try again!',
+            error: e.message,
+            data: null
+        })
+    }
+}
+
 module.exports = {
     importCourses,
+    getCourses
 };
