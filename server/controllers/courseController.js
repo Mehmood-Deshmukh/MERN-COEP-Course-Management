@@ -46,8 +46,6 @@ const transformRowToCourse = (row) => {
     const sem = row.Sem;
     const year = determineYear(sem);
 
-    if (!sem)
-        console.log(row.Subject);
 
     const divisions = calculateDivisions(year);
     const batches = divisions * 4;
@@ -122,30 +120,42 @@ const importCourses = async (req, res) => {
 
 const getCourses = async (req, res) => {
     try {
-        const page = parseInt(req.query.page);
-        const limit = parseInt(req.query.limit);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        const courses = await Course.find().sort({ subject: 1 }).skip(skip).limit(limit).lean();
-        
+        const courses = await Course.find()
+            .sort({ subject: 1 })
+            .skip(skip)
+            .limit(limit)
+            .populate({
+                path: 'assignments',
+                select: 'teacherId divisions batches lectureLoad labLoad',
+                populate: {
+                    path: 'teacherId',
+                    select: 'name position loadLimit assignedLoad status'
+                }
+            })
+            .lean();
+
         const totalCourses = await Course.countDocuments();
         const totalPages = Math.ceil(totalCourses / limit);
 
-        if (!courses) {
+        if (!courses.length) {
             return res.status(404).json({
                 success: false,
-                message: "courses not found!",
+                message: "Courses not found!",
                 data: null
-            })
+            });
         }
 
         return res.status(200).json({
             success: true,
-            message: "Courses Fetched successfully",
+            message: "Courses fetched successfully",
             page: page,
             totalPages,
             data: courses
-        })
+        });
 
     } catch (e) {
         console.log(e.message);
@@ -154,9 +164,10 @@ const getCourses = async (req, res) => {
             message: 'Error fetching courses! Please try again!',
             error: e.message,
             data: null
-        })
+        });
     }
-}
+};
+
 
 module.exports = {
     importCourses,
