@@ -59,6 +59,33 @@ const importTeachers = async (req, res) => {
 	}
 };
 
+const getTeachers = async (req, res) => {
+	try{
+		const teachers = await Teacher.find({}).sort({ name: 1 });
+		if (!teachers || teachers.length === 0) {
+			return res.status(404).json({
+				success: false,
+				message: "No teachers found!",
+				data: null
+			});
+		};
+
+		return res.status(200).json({
+			success: true,
+			message: "Teachers fetched successfully!",
+			data: teachers
+		});
+	}catch(e) {
+		console.log(e.message);
+		return res.status(500).json({
+			success: false,
+			message: "Failed to fetch teachers",
+			error: e.message,
+			data: null
+		})
+	}
+}
+
 const getTeacher = async (req, res) => {
 	try {
 		const teacherId = req.params.teacherId;
@@ -91,5 +118,6 @@ const getTeacher = async (req, res) => {
 
 module.exports = {
 	importTeachers,
-	getTeacher
+	getTeacher,
+	getTeachers
 };

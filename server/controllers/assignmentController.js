@@ -1,5 +1,40 @@
 const Assignment = require("../models/assignmentModel");
 
+const assignMultipleTeachers = async (req, res) => {
+    try {
+        const { assignments } = req.body;
+
+        for (let i = 0; i < assignments.length; i++) {
+            const { teacherId, courseId, divisions, batches } = assignments[i];
+
+            const _assignment = await Assignment.findOne({ teacherId, courseId });
+            if (_assignment) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Teacher already assigned to this course! Please update the assignment instead.",
+                    data: null
+                });
+            }
+
+            await Assignment.assignTeacher(teacherId, courseId, divisions, batches);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Teachers Assigned Successfully!",
+            data: null
+        });
+    } catch (e) {
+        console.log(e.message);
+        return res.status(500).json({
+            success: false,
+            error: e.message,
+            message: "Failed to assign teachers!",
+            data: null
+        })
+    }
+}
+
 const assignTeacher = async (req, res) => {
     try {
         const { teacherId, courseId, divisions, batches } = req.body;
@@ -84,6 +119,7 @@ const deleteAssignment = async (req, res) => {
 }
 
 module.exports = {
+    assignMultipleTeachers,
     assignTeacher,
     updateAssignment,
     deleteAssignment
