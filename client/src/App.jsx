@@ -1,5 +1,6 @@
 import './App.css';
 import FileUploader from './components/FileUpload';
+import TeacherAssignmentSystem from './components/CourseManagement';
 import { useState } from 'react';
 
 function App() {
@@ -44,6 +45,7 @@ function App() {
             <FileUploader fileType="xlsx" onFileUpload={onFileUpload} file={file} setFile={setFile} />
             <FileUploader fileType="csv" onFileUpload={onFileUpload} file={file} setFile={setFile}/>
             {loading && <p>Uploading...</p>}
+            <TeacherAssignmentSystem />
         </>
     );
 }
