@@ -68,6 +68,30 @@ const courseSchema = new Schema({
             return this.reqLectLoad + this.reqLabLoad;
         }
     },
+    totalLectLoad: {
+        type: Number,
+        default: function() {
+            return this.divisions * this.lectHrs;
+        }
+    },
+    totalLabLoad: {
+        type: Number,
+        default: function() {
+            return this.batches * this.labHrs;
+        }
+    },
+    totalTutLoad: {
+        type: Number,
+        default: function() {
+            return this.divisions * this.tutHrs;
+        }
+    },
+    totalLoad: {
+        type: Number,
+        default: function() {
+            return this.totalLectLoad + this.totalLabLoad + this.totalTutLoad;
+        }
+    },
     assignments: [{
         type: Schema.Types.ObjectId,
         ref: 'Assignment',

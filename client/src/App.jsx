@@ -1,48 +1,21 @@
 import './App.css';
-import FileUploader from './components/FileUpload';
 import TeacherAssignmentSystem from './components/CourseManagement';
-import { useState } from 'react';
 import TeacherSummary from './pages/TeacherSummary';
+import { Route, Routes } from 'react-router-dom';
+import Assignment from './pages/Assignment';
 
 function App() {
-    const [file, setFile] = useState(null);
-    const [loading, setLoading] = useState(false);
 
-    async function onFileUpload(type) {
-        let endpoint =""
-        if(type == "xlsx")
-            endpoint = "/api/courses"
-        else
-            endpoint = "/api/teachers"
-
-        if (!file) {
-            alert("Please select a file first.");
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const formData = new FormData();
-            formData.append("file", file);
-
-            const response = await fetch(`${endpoint}/import`, {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-            console.log(data.message, data.data);
-        } catch (e) {
-            console.log(e.message);
-            alert(e.message);
-        } finally {
-            setLoading(false);
-        }
-    }
 
     return (
         <>
-            <TeacherSummary />
+            <Routes>
+                <Route path="/" element={<Assignment />} />
+                <Route path="/courses" element={<TeacherAssignmentSystem />} />
+                <Route path="/teachers" element={<TeacherSummary />} />
+                <Route path="/assignments" element={<TeacherAssignmentSystem />} />
+            </Routes>
+            {/* <TeacherSummary /> */}
         </>
     );
 }

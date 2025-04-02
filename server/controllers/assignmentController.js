@@ -43,11 +43,26 @@ const assignMultipleTeachers = async (req, res) => {
                 }
 
                 const _assignment = await Assignment.findOne({ teacherId, courseId });
-                if (_assignment) {
-                    results.failed.push({
+                if (_assignment && (divisions > 0 || batches > 0)) {
+                    // results.failed.push({
+                    //     index: i,
+                    //     error: "Teacher already assigned to this course",
+                    //     assignment: assignments[i]
+                    // });
+
+                    // update if already assigned
+                    const result = await Assignment.updateAssignment(_assignment._id, divisions, batches);
+                    results.successful.push({
                         index: i,
-                        error: "Teacher already assigned to this course",
-                        assignment: assignments[i]
+                        result
+                    });
+                    continue;
+                }else if(_assignment && (divisions === 0 || batches === 0)){
+                    // delete if already assigned
+                    const result = await Assignment.deleteAssignment(_assignment._id);
+                    results.successful.push({
+                        index: i,
+                        result
                     });
                     continue;
                 }
