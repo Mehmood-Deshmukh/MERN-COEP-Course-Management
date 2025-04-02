@@ -7,11 +7,12 @@ const transformRowToTeacher = (row) => {
 	const loadLimit = parseFloat(row['Load']);
 	const name = row['Name'];
 	const position = row['Post'];
-
+	const status = loadLimit > 0 ? 'Active' : 'Inactive';
 	return {
 		name,
 		position,
-		loadLimit
+		loadLimit,
+		status
 	};
 };
 
