@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, User, Calendar, BookOpen, Clock, CircleCheck, AlertCircle, ChevronDown, ChevronUp, Search, Filter } from 'lucide-react';
+import { Users, User, Calendar, BookOpen, Clock, CircleCheck, AlertCircle, ChevronDown, ChevronUp, Search, Filter, Download } from 'lucide-react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
 const TeacherSummary = () => {
   const [teachers, setTeachers] = useState([]);
@@ -15,11 +16,9 @@ const TeacherSummary = () => {
     const fetchTeachers = async () => {
       try {
         setLoading(true);
-        // Fetch teachers with their assignments
         const response = await axios.get('/api/teachers/all');
         
         if (response.data.success) {
-          // For each teacher, fetch their assignments
           const teachersWithAssignments = await Promise.all(
             response.data.data.map(async (teacher) => {
               const assignmentsResponse = await axios.get(`/api/assignments/teacher/${teacher._id}`);
@@ -47,7 +46,6 @@ const TeacherSummary = () => {
   }, []);
 
   useEffect(() => {
-    // Filter teachers based on search term and status filter
     let filtered = [...teachers];
     
     if (searchTerm) {
@@ -67,16 +65,59 @@ const TeacherSummary = () => {
     setExpandedTeacher(expandedTeacher === teacherId ? null : teacherId);
   };
 
-  // Calculate load percentage for progress bars
   const calculateLoadPercentage = (assigned, limit) => {
     return Math.min(Math.round((assigned / limit) * 100), 100);
   };
 
-  // Get appropriate color class based on load percentage
   const getLoadColorClass = (percentage) => {
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 75) return 'bg-amber-500';
     return 'bg-emerald-500';
+  };
+
+  const exportToExcel = () => {
+    const exportData = teachers.map(teacher => {
+      const baseData = {
+        'Teacher Name': teacher.name,
+        'Position': teacher.position,
+        'Status': teacher.status,
+        'Assigned Load': teacher.assignedLoad,
+        'Load Limit': teacher.loadLimit,
+        'Remaining Load': teacher.loadLimit - teacher.assignedLoad,
+        'Load Percentage': `${calculateLoadPercentage(teacher.assignedLoad, teacher.loadLimit)}%`
+      };
+      
+      if (!teacher.assignmentsDetails || teacher.assignmentsDetails.length === 0) {
+        return {
+          ...baseData,
+          'Course Name': 'No assignments',
+          'Course Code': '',
+          'Divisions': '',
+          'Batches': '',
+          'Lecture Load': 0,
+          'Lab Load': 0,
+          'Total Load': 0
+        };
+      }
+      
+      return teacher.assignmentsDetails.map(assignment => ({
+        ...baseData,
+        'Course Name': assignment.courseId.subject,
+        'Course Code': assignment.courseId.code,
+        'Divisions': assignment.divisions,
+        'Batches': assignment.batches,
+        'Lecture Load': assignment.lectureLoad,
+        'Lab Load': assignment.labLoad,
+        'Total Load': assignment.lectureLoad + assignment.labLoad
+      }));
+    }).flat();
+    
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Teacher Assignments');
+    
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `Teacher_Assignments_${date}.xlsx`);
   };
 
   if (loading) {
@@ -105,12 +146,20 @@ const TeacherSummary = () => {
           <Users className="h-8 w-8 text-blue-600 mr-3" />
           <h1 className="text-3xl font-bold text-gray-800">Teacher Summary</h1>
         </div>
-        <div className="bg-blue-50 px-4 py-2 rounded-lg">
-          <span className="text-blue-800 font-medium">Total Teachers: {teachers.length}</span>
+        <div className="flex space-x-4">
+          <div className="bg-blue-50 px-4 py-2 rounded-lg">
+            <span className="text-blue-800 font-medium">Total Teachers: {teachers.length}</span>
+          </div>
+          <button 
+            onClick={exportToExcel}
+            className="flex items-center bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+          >
+            <Download className="h-5 w-5 mr-2" />
+            Export to Excel
+          </button>
         </div>
       </div>
 
-      {/* Search and Filter Section */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
         <div className="relative flex-grow">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -140,7 +189,6 @@ const TeacherSummary = () => {
         </div>
       </div>
 
-      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center">
@@ -179,7 +227,6 @@ const TeacherSummary = () => {
         </div>
       </div>
 
-      {/* Teachers List */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
         <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
           <h2 className="text-lg font-medium text-gray-800">Teachers & Assignments</h2>
@@ -239,7 +286,6 @@ const TeacherSummary = () => {
                     </div>
                   </div>
                   
-                  {/* Mobile view for load */}
                   <div className="md:hidden mt-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className={`px-2 py-1 text-xs rounded-full ${
@@ -260,7 +306,6 @@ const TeacherSummary = () => {
                   </div>
                 </div>
                 
-                {/* Expanded Teacher Details */}
                 {expandedTeacher === teacher._id && (
                   <div className="px-6 py-4 bg-gray-50">
                     <div className="mb-4">
@@ -300,7 +345,7 @@ const TeacherSummary = () => {
                               <tr key={assignment._id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 whitespace-nowrap">
                                   <div className="text-sm font-medium text-gray-900">
-                                    {assignment.courseId.name}
+                                    {assignment.courseId.subject}
                                   </div>
                                   <div className="text-xs text-gray-500">
                                     {assignment.courseId.code}

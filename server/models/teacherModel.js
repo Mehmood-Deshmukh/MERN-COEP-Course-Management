@@ -28,17 +28,12 @@ const teacherSchema = new Schema({
         type: [Schema.Types.ObjectId],
         ref: 'Assignment',
         default: []
+    },
+    remainingLoad: {
+        type: Number,
+        default: this.loadLimit - this.assignedLoad
     }
 }, { timestamps: true });
 
-
-teacherSchema.virtual('remainingLoad').get(function () {
-    return this.loadLimit - this.assignedLoad;
-});
-
-teacherSchema.pre('save', function (next) {
-    this.status = this.remainingLoad > 0 ? 'Active' : 'Inactive';
-    next();
-});
 
 module.exports = mongoose.model('Teacher', teacherSchema);

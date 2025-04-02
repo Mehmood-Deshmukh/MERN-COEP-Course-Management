@@ -83,6 +83,7 @@ assignmentSchema.statics.assignTeacher = async function (teacherId, courseId, di
 
 	teacher.assignments.push(assignment._id);
 	teacher.assignedLoad = lectureLoad + labLoad;
+	teacher.remainingLoad = teacher.loadLimit - teacher.assignedLoad;
 	await teacher.save();
 
 	return assignment;
@@ -120,6 +121,7 @@ assignmentSchema.statics.updateAssignment = async function(id, divisions, batche
 
 	// this looks very redundant
 	teacher.assignedLoad = assignment.lectureLoad + assignment.labLoad;
+	teacher.remainingLoad = teacher.loadLimit - teacher.assignedLoad;
 	await teacher.save();
 
 	return {
@@ -140,6 +142,7 @@ assignmentSchema.statics.deleteAssignment = async function (id) {
 	if (!course) throw new Error("Course Not Found!");
 
 	teacher.assignedLoad -= assignment.lectureLoad + assignment.labLoad;
+	teacher.remainingLoad = teacher.loadLimit - teacher.assignedLoad;
 	// teacher.assignments = teacher.assignments.filter(a => a.toString() !== id);
 	teacher.assignments.pull(assignment._id);
 	await teacher.save();
