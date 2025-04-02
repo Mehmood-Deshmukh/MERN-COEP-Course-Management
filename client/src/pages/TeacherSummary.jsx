@@ -87,30 +87,27 @@ const TeacherSummary = () => {
         'Load Percentage': `${calculateLoadPercentage(teacher.assignedLoad, teacher.loadLimit)}%`
       };
       
-      if (!teacher.assignmentsDetails || teacher.assignmentsDetails.length === 0) {
-        return {
-          ...baseData,
-          'Course Name': 'No assignments',
-          'Course Code': '',
-          'Divisions': '',
-          'Batches': '',
-          'Lecture Load': 0,
-          'Lab Load': 0,
-          'Total Load': 0
-        };
+      // Create the assignments JSON data
+      let assignmentsJson = [];
+      
+      if (teacher.assignmentsDetails && teacher.assignmentsDetails.length > 0) {
+        assignmentsJson = teacher.assignmentsDetails.map(assignment => ({
+          courseName: assignment.courseId.subject,
+          courseCode: assignment.courseId.code,
+          divisions: assignment.divisions,
+          batches: assignment.batches,
+          lectureLoad: assignment.lectureLoad,
+          labLoad: assignment.labLoad,
+          totalLoad: assignment.lectureLoad + assignment.labLoad
+        }));
       }
       
-      return teacher.assignmentsDetails.map(assignment => ({
+      // Add the assignments as a single JSON column
+      return {
         ...baseData,
-        'Course Name': assignment.courseId.subject,
-        'Course Code': assignment.courseId.code,
-        'Divisions': assignment.divisions,
-        'Batches': assignment.batches,
-        'Lecture Load': assignment.lectureLoad,
-        'Lab Load': assignment.labLoad,
-        'Total Load': assignment.lectureLoad + assignment.labLoad
-      }));
-    }).flat();
+        'Assignments': JSON.stringify(assignmentsJson)
+      };
+    });
     
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();

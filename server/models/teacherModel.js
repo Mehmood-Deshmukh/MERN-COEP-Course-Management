@@ -31,9 +31,10 @@ const teacherSchema = new Schema({
     },
     remainingLoad: {
         type: Number,
-        default: this.loadLimit - this.assignedLoad
+        default: function() {
+            return this.loadLimit - this.assignedLoad;
+        }
     }
 }, { timestamps: true });
-
 
 module.exports = mongoose.model('Teacher', teacherSchema);
