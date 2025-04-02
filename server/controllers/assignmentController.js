@@ -118,9 +118,32 @@ const deleteAssignment = async (req, res) => {
     }
 }
 
+
+const getAssignmentsByTeacher = async (req, res) => {   
+    try {
+        const { id } = req.params;
+        const assignments = await Assignment.find({ teacherId: id }).populate('courseId').lean();
+        
+        return res.status(200).json({
+            success: true,
+            message: "Assignments fetched successfully",
+            data: assignments
+        });
+    } catch (e) {
+        console.log(e.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Error fetching assignments! Please try again!',
+            error: e.message,
+            data: null
+        });
+    }
+}
+
 module.exports = {
     assignMultipleTeachers,
     assignTeacher,
     updateAssignment,
-    deleteAssignment
+    deleteAssignment,
+    getAssignmentsByTeacher
 }

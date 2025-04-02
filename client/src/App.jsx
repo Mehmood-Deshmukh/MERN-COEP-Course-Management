@@ -2,6 +2,7 @@ import './App.css';
 import FileUploader from './components/FileUpload';
 import TeacherAssignmentSystem from './components/CourseManagement';
 import { useState } from 'react';
+import TeacherSummary from './pages/TeacherSummary';
 
 function App() {
     const [file, setFile] = useState(null);
@@ -41,11 +42,7 @@ function App() {
 
     return (
         <>
-            <h1>Hello! Welcome To COEP Course Management Portal</h1>
-            <FileUploader fileType="xlsx" onFileUpload={onFileUpload} file={file} setFile={setFile} />
-            <FileUploader fileType="csv" onFileUpload={onFileUpload} file={file} setFile={setFile}/>
-            {loading && <p>Uploading...</p>}
-            <TeacherAssignmentSystem />
+            <TeacherSummary />
         </>
     );
 }
