@@ -37,14 +37,14 @@ const Assignment = () => {
 		}
 	}
 	return <div>
-        <h1>Assignment</h1>
+        {/* <h1>Assignment</h1>
         <h1>courses.xlsx</h1>
         <FileUpload setFile={setFile} loading={loading} onFileUpload={onFileUpload} fileType="xlsx"/>
         
         <h1>teachers.csv</h1>
         <FileUpload setFile={setFile} loading={loading} onFileUpload={onFileUpload} fileType="csv"/>
         
-        <h1>Course Management</h1>
+        <h1>Course Management</h1> */}
         <TeacherAssignment />
     </div>;
 };
