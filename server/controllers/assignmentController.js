@@ -280,17 +280,7 @@ const getAssignmentsByTeacher = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Assignments fetched successfully",
-            data: {
-                teacher: {
-                    name: teacher.name,
-                    position: teacher.position,
-                    loadLimit: teacher.loadLimit,
-                    assignedLoad: teacher.assignedLoad,
-                    remainingLoad: teacher.remainingLoad,
-                    status: teacher.status
-                },
-                assignments
-            }
+            data: assignments
         });
     } catch (e) {
         console.log(e.message);

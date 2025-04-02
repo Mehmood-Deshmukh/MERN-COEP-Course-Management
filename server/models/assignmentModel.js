@@ -79,6 +79,9 @@ assignmentSchema.statics.assignTeacher = async function(teacherId, courseId, div
     teacher.assignments.push(assignment._id);
     teacher.assignedLoad += totalLoad;
     teacher.remainingLoad = teacher.loadLimit - teacher.assignedLoad;
+
+
+	teacher.status = teacher.remainingLoad === 0 ? 'Inactive' : 'Active';
     await teacher.save();
 
     return {
@@ -124,6 +127,8 @@ assignmentSchema.statics.updateAssignment = async function(id, divisions, batche
 
     teacher.assignedLoad += loadDifference;
     teacher.remainingLoad = teacher.loadLimit - teacher.assignedLoad;
+
+	teacher.status = teacher.remainingLoad === 0 ? 'Inactive' : 'Active';
     await teacher.save();
 
     return {
@@ -148,6 +153,8 @@ assignmentSchema.statics.deleteAssignment = async function(id) {
     teacher.assignedLoad -= totalLoad;
     teacher.remainingLoad = teacher.loadLimit - teacher.assignedLoad;
     teacher.assignments.pull(assignment._id);
+
+	teacher.status = teacher.remainingLoad === 0 ? 'Inactive' : 'Active';
     await teacher.save();
 
     course.assignments.pull(assignment._id);
