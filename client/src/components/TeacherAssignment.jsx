@@ -450,8 +450,8 @@ const TeacherAssignment = () => {
   }, [message]);
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <div className="container mx-auto px-4 py-6">
+    <div className="bg-gray-50 w-full min-h-screen">
+      <div className="mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow-md p-6">
           {/* Header and Actions */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">

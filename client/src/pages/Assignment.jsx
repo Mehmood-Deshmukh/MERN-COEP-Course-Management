@@ -36,8 +36,8 @@ const Assignment = () => {
 			setLoading(false);
 		}
 	}
-	return <div>
-        {/* <h1>Assignment</h1>
+	return (<div>
+		{/* <h1>Assignment</h1>
         <h1>courses.xlsx</h1>
         <FileUpload setFile={setFile} loading={loading} onFileUpload={onFileUpload} fileType="xlsx"/>
         
@@ -45,8 +45,8 @@ const Assignment = () => {
         <FileUpload setFile={setFile} loading={loading} onFileUpload={onFileUpload} fileType="csv"/>
         
         <h1>Course Management</h1> */}
-        <TeacherAssignment />
-    </div>;
+		<TeacherAssignment />
+	</div>);
 };
 
 export default Assignment;
