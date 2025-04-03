@@ -1,679 +1,802 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-	ChevronDown,
-	Check,
-	AlertCircle,
-	Info,
-	RefreshCw,
-	Save,
-	X,
-	Minus,
-	Edit,
-	Plus,
+  ChevronDown,
+  Check,
+  AlertCircle,
+  Info,
+  RefreshCw,
+  Save,
+  X,
+  Minus,
+  Edit,
+  Plus,
+  Search,
+  Filter,
+  Loader
 } from "lucide-react";
 import TeacherSelector from "./TeacherSelector";
 
 const TeacherAssignment = () => {
-	const [teachers, setTeachers] = useState([]);
-	const [courses, setCourses] = useState([]);
-	const [assignments, setAssignments] = useState([]);
-	const [currentPage, setCurrentPage] = useState(1);
-	const [loading, setLoading] = useState(false);
-	const [message, setMessage] = useState(null);
-	const [totalPages, setTotalPages] = useState(1);
+  const [teachers, setTeachers] = useState([]);
+  const [allCourses, setAllCourses] = useState([]); // Store all courses
+  const [courses, setCourses] = useState([]); // Store filtered courses
+  const [filteredCourses, setFilteredCourses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCourses, setTotalCourses] = useState(0);
+  const [yearOptions] = useState(['1st Year', '2nd Year', '3rd Year', '4th Year', 'MTech 1st Year', 'MTech 2nd Year']);
+  const [selectedYear, setSelectedYear] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchTimeout, setSearchTimeout] = useState(null);
+  const [itemsPerPage] = useState(20); // Items to show per page for load more
 
-	// =========================================FETCH DATA FUNCTIONS ===============================================
-	const fetchTeachers = async () => {
-		setLoading(true);
-		try {
-			const response = await fetch("/api/teachers/all");
-			const data = await response.json();
+  // =========================================FETCH DATA FUNCTIONS ===============================================
+  const fetchTeachers = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/teachers/all");
+      const data = await response.json();
 
-			if (data.success) {
-				setTeachers(data.data);
-			} else {
-				setMessage({
-					type: "error",
-					text: data.message || "Failed to fetch teachers",
-				});
-			}
-		} catch (error) {
-			setMessage({ type: "error", text: "Failed to fetch teachers" });
-			console.error("Error fetching teachers:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
+      if (data.success) {
+        setTeachers(data.data);
+      } else {
+        setMessage({
+          type: "error",
+          text: data.message || "Failed to fetch teachers",
+        });
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to fetch teachers" });
+      console.error("Error fetching teachers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	const fetchCourses = async (page) => {
-		setLoading(true);
-		try {
-			const response = await fetch(`/api/courses/?limit=20&page=${page}`);
-			const data = await response.json();
+  const fetchCourses = async () => {
+    setLoading(true);
+    try {
+      // Fetch all courses at once
+      let url = `/api/courses?limit=200&page=1`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
 
-			if (data.success) {
-				setCourses(data.data);
-				setCurrentPage(data.page);
-				setTotalPages(data.totalPages);
-
-				let _assignments = [];
-				data.data.forEach((course) => {
-					_assignments = [
-						..._assignments,
-						...course.assignments.map((a) => ({
-							courseId: course._id,
-							teacherId: a.teacherId._id,
-							divisions: a.divisions,
-							batches: a.batches,
-                            original: true
-						})),
-					];
-				});
-
-				console.log(_assignments);
-				setAssignments(_assignments);
-			} else {
-				setMessage({
-					type: "error",
-					text: data.message || "Failed to fetch courses",
-				});
-			}
-		} catch (error) {
-			setMessage({ type: "error", text: "Failed to fetch courses" });
-			console.error("Error fetching courses:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
-	// =====================================================================================================
-
-	useEffect(() => {
-		fetchTeachers();
-		fetchCourses(currentPage);
-	}, [currentPage]);
-
-	// ==================================================================================================
-	// ================================= VERY IMPORTANT FUNCTION ========================================
-	// ==================================================================================================
-	const handleAssignTeacher = (courseId, teacherId, divisions, batches) => {
-		setLoading(true);
-
-		/*
-            1. check if any assignment already exists for given courseId and teacherId pair (because for each courseId-teacherId pair, there can be only one assignment)
-            2. if exists, then update the assignment with new divisions and batches
-            3. if not, then create a new assignment
-            4. show success message
+      if (data.success) {
+        // Store all courses
+        const coursesData = data.data;
+        setAllCourses(coursesData);
+        setTotalCourses(coursesData.length);
         
+        // Apply initial filtering
+        applyFiltersAndPagination(coursesData);
 
-            Now, whenever we update the assignments, we have to update both teachers and courses state variables to show how the data will look like when we will submit these
+        // Process all assignments from courses
+        let _assignments = [];
+        coursesData.forEach((course) => {
+          if (course.assignments && Array.isArray(course.assignments)) {
+            _assignments = [
+              ..._assignments,
+              ...course.assignments.map((a) => ({
+                courseId: course._id,
+                teacherId: a.teacherId._id,
+                divisions: a.divisions,
+                batches: a.batches,
+                original: true
+              })),
+            ];
+          }
+        });
 
-            1. update teachers state variable:
-            for teacher~ 
-            the field assignedLoad will be updated
-            for each division load of (course.lectHrs) needs to be added to the teacher's assignedLoad
-            for each batch load of (course.labHrs) needs to be added to the teacher's assignedLoad
-            so, 
-            teacher.assignedLoad += course.lectHrs * divisions + course.labHrs * batches
+        setAssignments(_assignments);
+      } else {
+        setMessage({
+          type: "error",
+          text: data.message || "Failed to fetch courses",
+        });
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to fetch courses" });
+      console.error("Error fetching courses:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            2. update courses state variable:
-            for course~
-            the field reqLectLoad and reqLabLoad will be updated
-            for each division load of (course.lectHrs) needs to be deducted from the course's reqLectLoad
-            for each batch load of (course.labHrs) needs to be deducted from the course's reqLabLoad
-            so,
-            course.reqLectLoad -= course.lectHrs * divisions
-            course.reqLabLoad -= course.labHrs * batches
+  // Apply filters to courses and handle pagination
+  const applyFiltersAndPagination = (sourceCourses = allCourses, page = 1, year = selectedYear, query = searchQuery) => {
+    // Apply filters
+    let filtered = [...sourceCourses];
+    
+    // Filter by year if selected
+    if (year) {
+      filtered = filtered.filter(course => course.year === year);
+    }
+    
+    // Filter by search query if present
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      filtered = filtered.filter(course => 
+        course.subject.toLowerCase().includes(lowerQuery) || 
+        course._id.toLowerCase().includes(lowerQuery) ||
+        (course.curriculum && course.curriculum.toLowerCase().includes(lowerQuery))
+      );
+    }
+    
+    // Calculate total after filtering
+    setTotalCourses(filtered.length);
+    
+    // Apply pagination for load more
+    const endIndex = page * itemsPerPage;
+    const paginatedCourses = filtered.slice(0, endIndex);
+    
+    // Update state
+    setCourses(paginatedCourses);
+    setFilteredCourses(paginatedCourses);
+    setCurrentPage(page);
+    setHasMore(endIndex < filtered.length);
+  };
 
-            NOTE:
-            when updating teachers and courses you need to first restore the state variables to their original values and then update them with the new values
+  // Handle search input with debounce
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    const timeout = setTimeout(() => {
+      applyFiltersAndPagination(allCourses, 1, selectedYear, query);
+    }, 300); // 300ms debounce
+    
+    setSearchTimeout(timeout);
+  };
 
-            so for course
-            course.reqLectLoad += assignment.divisions * course.lectHrs
-            course.reqLabLoad += assignment.batches * course.labHrs
-            
-            for teacher
-            teacher.assignedLoad -= assignment.divisions * course.lectHrs + assignment.batches * course.labHrs
+  // Handle year filter change
+  const handleYearChange = (e) => {
+    const year = e.target.value;
+    setSelectedYear(year);
+    applyFiltersAndPagination(allCourses, 1, year, searchQuery);
+  };
 
-            and then update the state variables with the new values
-        */
-		try {
-			const existingAssignment = assignments.find(
-				(assignment) =>
-					assignment?.courseId === courseId &&
-					assignment?.teacherId === teacherId
-			);
+  // Load more courses
+  const handleLoadMore = () => {
+    const nextPage = currentPage + 1;
+    applyFiltersAndPagination(allCourses, nextPage, selectedYear, searchQuery);
+  };
 
-			if (existingAssignment) {
-				// Update existing assignment
-				const updatedAssignments = assignments.map((assignment) => {
-					if (
-						assignment?.courseId === courseId &&
-						assignment?.teacherId === teacherId
-					) {
-						return { ...assignment, divisions, batches };
-					}
-					return assignment;
-				});
-				setAssignments(updatedAssignments);
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedYear("");
+    setSearchQuery("");
+    applyFiltersAndPagination(allCourses, 1, "", "");
+  };
 
-				// Update teachers and courses state variables
-				const course = courses.find(
-					(course) => course._id === courseId
-				);
-				const updatedTeachers = teachers.map((teacher) => {
-					if (teacher._id === teacherId) {
-						return {
-							...teacher,
-							assignedLoad:
-								teacher.assignedLoad -
-								existingAssignment.divisions * course.lectHrs -
-								existingAssignment.batches * course.labHrs +
-								divisions * course.lectHrs +
-								batches * course.labHrs,
-						};
-					}
-					return teacher;
-				});
+  useEffect(() => {
+    fetchTeachers();
+    fetchCourses();
+  }, []);
 
-				const updatedCourses = courses.map((course) => {
-					if (course._id === courseId) {
-						return {
-							...course,
-							reqLectLoad:
-								course.reqLectLoad +
-								existingAssignment.divisions * course.lectHrs -
-								divisions * course.lectHrs,
-							reqLabLoad:
-								course.reqLabLoad +
-								existingAssignment.batches * course.labHrs -
-								batches * course.labHrs,
-						};
-					}
-					return course;
-				});
-				setTeachers(updatedTeachers);
-				setCourses(updatedCourses);
-			} else {
-				// Create new assignment
-				const newAssignment = {
-					courseId,
-					teacherId,
-					divisions,
-					batches,
-				};
+  // ==================================================================================================
+  // ================================= VERY IMPORTANT FUNCTION ========================================
+  // ==================================================================================================
+  const handleAssignTeacher = (courseId, teacherId, divisions, batches) => {
+    setLoading(true);
 
-				const updatedAssignments = [...assignments, newAssignment];
-				setAssignments(updatedAssignments);
+    try {
+      const existingAssignment = assignments.find(
+        (assignment) =>
+          assignment?.courseId === courseId &&
+          assignment?.teacherId === teacherId
+      );
 
-				// Update teachers and courses state variables
-				const course = courses.find(
-					(course) => course._id === courseId
-				);
+      if (existingAssignment) {
+        // Update existing assignment
+        const updatedAssignments = assignments.map((assignment) => {
+          if (
+            assignment?.courseId === courseId &&
+            assignment?.teacherId === teacherId
+          ) {
+            return { ...assignment, divisions, batches };
+          }
+          return assignment;
+        });
+        setAssignments(updatedAssignments);
 
-				const updatedTeachers = teachers.map((teacher) => {
-					if (teacher._id === teacherId) {
-						return {
-							...teacher,
-							assignedLoad:
-								teacher.assignedLoad +
-								divisions * course.lectHrs +
-								batches * course.labHrs,
-						};
-					}
-					return teacher;
-				});
+        // Update teachers and courses state variables
+        const course = allCourses.find((course) => course._id === courseId);
+        const updatedTeachers = teachers.map((teacher) => {
+          if (teacher._id === teacherId) {
+            return {
+              ...teacher,
+              assignedLoad:
+                teacher.assignedLoad -
+                existingAssignment.divisions * course.lectHrs -
+                existingAssignment.batches * course.labHrs +
+                divisions * course.lectHrs +
+                batches * course.labHrs,
+            };
+          }
+          return teacher;
+        });
 
-				const updatedCourses = courses.map((course) => {
-					if (course._id === courseId) {
-						return {
-							...course,
-							reqLectLoad:
-								course.reqLectLoad - divisions * course.lectHrs,
-							reqLabLoad:
-								course.reqLabLoad - batches * course.labHrs,
-						};
-					}
-					return course;
-				});
+        // Update all courses including those not currently displayed
+        const updatedAllCourses = allCourses.map((course) => {
+          if (course._id === courseId) {
+            return {
+              ...course,
+              reqLectLoad:
+                course.reqLectLoad +
+                existingAssignment.divisions * course.lectHrs -
+                divisions * course.lectHrs,
+              reqLabLoad:
+                course.reqLabLoad +
+                existingAssignment.batches * course.labHrs -
+                batches * course.labHrs,
+            };
+          }
+          return course;
+        });
 
-				setTeachers(updatedTeachers);
-				setCourses(updatedCourses);
-			}
+        // Update displayed courses
+        const updatedCourses = courses.map((course) => {
+          if (course._id === courseId) {
+            return {
+              ...course,
+              reqLectLoad:
+                course.reqLectLoad +
+                existingAssignment.divisions * course.lectHrs -
+                divisions * course.lectHrs,
+              reqLabLoad:
+                course.reqLabLoad +
+                existingAssignment.batches * course.labHrs -
+                batches * course.labHrs,
+            };
+          }
+          return course;
+        });
 
-			// Show success message
-			setMessage({
-				type: "success",
-				text: "Assignment updated successfully",
-			});
-		} catch (e) {
-			console.error("Error updating assignment:", e);
-			setMessage({ type: "error", text: "Failed to update assignment" });
-		} finally {
-			setLoading(false);
-		}
-	};
+        setTeachers(updatedTeachers);
+        setAllCourses(updatedAllCourses);
+        setCourses(updatedCourses);
+        setFilteredCourses(updatedCourses);
+      } else {
+        // Create new assignment
+        const newAssignment = {
+          courseId,
+          teacherId,
+          divisions,
+          batches,
+        };
 
-	// ==================================================================================================
-	const getRemainingDivisions = (courseId) => {
-		const course = courses.find((c) => c._id === courseId);
-		if (!course) return 0;
+        const updatedAssignments = [...assignments, newAssignment];
+        setAssignments(updatedAssignments);
 
-		const filteredAssignments = assignments.filter(
-			(assignment) => assignment.courseId === courseId
-		);
-		let assignedDivisions = 0;
-		filteredAssignments.forEach((assignment) => {
-			assignedDivisions += assignment.divisions;
-		});
+        // Update teachers and courses state variables
+        const course = allCourses.find((course) => course._id === courseId);
 
-		return course.divisions - assignedDivisions;
-	};
+        const updatedTeachers = teachers.map((teacher) => {
+          if (teacher._id === teacherId) {
+            return {
+              ...teacher,
+              assignedLoad:
+                teacher.assignedLoad +
+                divisions * course.lectHrs +
+                batches * course.labHrs,
+            };
+          }
+          return teacher;
+        });
 
-	const getRemainingBatches = (courseId) => {
-		const course = courses.find((c) => c._id === courseId);
-		if (!course) return 0;
+        // Update all courses including those not currently displayed
+        const updatedAllCourses = allCourses.map((course) => {
+          if (course._id === courseId) {
+            return {
+              ...course,
+              reqLectLoad: course.reqLectLoad - divisions * course.lectHrs,
+              reqLabLoad: course.reqLabLoad - batches * course.labHrs,
+            };
+          }
+          return course;
+        });
 
-		const assignedBatches = assignments
-			.filter((a) => a.courseId === courseId)
-			.reduce((total, assignment) => total + assignment.batches, 0);
+        // Update displayed courses
+        const updatedCourses = courses.map((course) => {
+          if (course._id === courseId) {
+            return {
+              ...course,
+              reqLectLoad: course.reqLectLoad - divisions * course.lectHrs,
+              reqLabLoad: course.reqLabLoad - batches * course.labHrs,
+            };
+          }
+          return course;
+        });
 
-		return course.batches - assignedBatches;
-	};
+        setTeachers(updatedTeachers);
+        setAllCourses(updatedAllCourses);
+        setCourses(updatedCourses);
+        setFilteredCourses(updatedCourses);
+      }
 
-	const getAssignedTeachers = (courseId) => {
-		return assignments
-			.filter((a) => a.courseId === courseId)
-			.map((a) => a.teacherId);
-	};
+      // Show success message
+      setMessage({
+        type: "success",
+        text: "Assignment updated successfully",
+      });
+    } catch (e) {
+      console.error("Error updating assignment:", e);
+      setMessage({ type: "error", text: "Failed to update assignment" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	const calculateAssignedLoad = (teacherId) => {
-		return assignments
-			.filter((a) => a.teacherId === teacherId)
-			.reduce((total, assignment) => {
-				const course = courses.find(
-					(c) => c._id === assignment.courseId
-				);
-				if (!course) return total;
+  // ==================================================================================================
+  const getRemainingDivisions = (courseId) => {
+    const course = allCourses.find((c) => c._id === courseId);
+    if (!course) return 0;
 
-				const lectLoad = assignment.divisions * course.lectHrs;
-				const labLoad = assignment.batches * course.labHrs;
+    const filteredAssignments = assignments.filter(
+      (assignment) => assignment.courseId === courseId
+    );
+    let assignedDivisions = 0;
+    filteredAssignments.forEach((assignment) => {
+      assignedDivisions += assignment.divisions;
+    });
 
-				return total + lectLoad + labLoad;
-			}, 0);
-	};
+    return course.divisions - assignedDivisions;
+  };
 
-	const getRemainingLoad = (teacherId) => {
-		const teacher = teachers.find((t) => t._id === teacherId);
-		if (!teacher) return 0;
+  const getRemainingBatches = (courseId) => {
+    const course = allCourses.find((c) => c._id === courseId);
+    if (!course) return 0;
 
-		const assignedLoad = calculateAssignedLoad(teacherId);
-		return teacher.loadLimit - assignedLoad;
-	};
+    const assignedBatches = assignments
+      .filter((a) => a.courseId === courseId)
+      .reduce((total, assignment) => total + assignment.batches, 0);
 
-	// ==================================================================================================
+    return course.batches - assignedBatches;
+  };
 
-	const handleSubmitAssignments = async () => {
-		setLoading(true);
-		try {
-            const finalAssignments = assignments.filter((a) => a.original !== true);
+  const getAssignedTeachers = (courseId) => {
+    return assignments
+      .filter((a) => a.courseId === courseId)
+      .map((a) => a.teacherId);
+  };
 
-			const response = await fetch("/api/assignments/assign/multiple", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ assignments: finalAssignments }),
-			});
+  const calculateAssignedLoad = (teacherId) => {
+    return assignments
+      .filter((a) => a.teacherId === teacherId)
+      .reduce((total, assignment) => {
+        const course = allCourses.find((c) => c._id === assignment.courseId);
+        if (!course) return total;
 
-			const data = await response.json();
+        const lectLoad = assignment.divisions * course.lectHrs;
+        const labLoad = assignment.batches * course.labHrs;
 
-			if (data.success) {
-				setMessage({
-					type: "success",
-					text: data.message || "Teachers assigned successfully!",
-				});
-				setAssignments([]);
-				fetchTeachers();
-			} else {
-				setMessage({
-					type: "error",
-					text: data.message || "Failed to assign teachers",
-				});
-			}
-		} catch (error) {
-			setMessage({ type: "error", text: "Failed to assign teachers" });
-			console.error("Error assigning teachers:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
+        return total + lectLoad + labLoad;
+      }, 0);
+  };
 
-	return (
-		<div className="bg-gray-50 min-h-screen">
-			<div className="container-fluid px-2 py-4">
-				<div className="bg-white rounded-lg shadow-md p-4">
-					<div className="flex justify-between items-center mb-4">
-						<h1 className="text-2xl font-bold text-gray-800">
-							Teacher Assignment System
-						</h1>
-						<div className="flex space-x-2">
-							<button
-								onClick={() => fetchCourses(currentPage)}
-								className="px-3 py-2 bg-gray-100 text-gray-700 rounded flex items-center border border-gray-300 hover:bg-gray-200 transition-colors"
-							>
-								<RefreshCw size={16} className="mr-1" />
-								Refresh
-							</button>
-							<button
-								onClick={handleSubmitAssignments}
-								disabled={assignments.length === 0 || loading}
-								className="px-3 py-2 bg-blue-600 text-white rounded flex items-center shadow-sm hover:bg-blue-700 transition-colors disabled:bg-blue-300"
-							>
-								<Save size={16} className="mr-1" />
-								{loading ? "Saving..." : "Save All Assignments"}
-							</button>
-						</div>
-					</div>
+  const getRemainingLoad = (teacherId) => {
+    const teacher = teachers.find((t) => t._id === teacherId);
+    if (!teacher) return 0;
 
-					{message && (
-						<div
-							className={`p-3 mb-4 rounded-md border ${
-								message.type === "success"
-									? "bg-green-50 border-green-200 text-green-800"
-									: "bg-red-50 border-red-200 text-red-800"
-							} flex items-center`}
-						>
-							{message.type === "success" ? (
-								<Check
-									size={18}
-									className="mr-2 flex-shrink-0"
-								/>
-							) : (
-								<AlertCircle
-									size={18}
-									className="mr-2 flex-shrink-0"
-								/>
-							)}
-							<span>{message.text}</span>
-						</div>
-					)}
+    const assignedLoad = calculateAssignedLoad(teacherId);
+    return teacher.loadLimit - assignedLoad;
+  };
 
-					<div className="mb-3 flex justify-between items-center">
-						<div className="text-sm text-gray-600 flex items-center">
-							<Info size={14} className="mr-1" />
-							<span>
-								Showing {courses.length} course(s) from page{" "}
-								{currentPage} of {totalPages}
-							</span>
-						</div>
-						<div className="flex items-center space-x-1">
-							<button
-								onClick={() => fetchCourses(currentPage - 1)}
-								disabled={currentPage <= 1 || loading}
-								className="px-2 py-1 rounded-md border border-gray-300 text-gray-700 disabled:text-gray-400 disabled:bg-gray-50 hover:bg-gray-100 transition-colors"
-							>
-								Previous
-							</button>
-							<div className="px-2 py-1 text-gray-700">
-								Page {currentPage} of {totalPages}
-							</div>
-							<button
-								onClick={() => fetchCourses(currentPage + 1)}
-								disabled={currentPage >= totalPages || loading}
-								className="px-2 py-1 rounded-md border border-gray-300 text-gray-700 disabled:text-gray-400 disabled:bg-gray-50 hover:bg-gray-100 transition-colors"
-							>
-								Next
-							</button>
-						</div>
-					</div>
+  // ==================================================================================================
 
-					<div className="overflow-x-auto rounded-lg border border-gray-200">
-						<table className="w-full divide-y divide-gray-200">
-							<thead className="bg-gray-50">
-								<tr>
-									<th
-										scope="col"
-										className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12"
-									>
-										Course
-									</th>
-									<th
-										scope="col"
-										className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/15"
-									>
-										Curr/Sem
-									</th>
-									<th
-										scope="col"
-										className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
-									>
-										Divisions
-									</th>
-									<th
-										scope="col"
-										className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
-									>
-										Batches
-									</th>
-									<th
-										scope="col"
-										className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
-									>
-										Lect.
-									</th>
-									<th
-										scope="col"
-										className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
-									>
-										Lab
-									</th>
-									<th
-										scope="col"
-										className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
-									>
-										Total
-									</th>
-									<th
-										scope="col"
-										className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-6/12"
-										colSpan={6}
-									>
-										Teacher Assignments
-									</th>
-								</tr>
-							</thead>
-							<tbody className="bg-white divide-y divide-gray-200">
-								{courses.map((course) => {
-									const remainingDivisions =
-										getRemainingDivisions(course._id);
-									const remainingBatches =
-										getRemainingBatches(course._id);
-									const assignedTeachers =
-										getAssignedTeachers(course._id);
+  const handleSubmitAssignments = async () => {
+    setLoading(true);
+    try {
+      const finalAssignments = assignments.filter((a) => a.original !== true);
 
-									return (
-										<tr
-											key={course._id}
-											className="hover:bg-gray-50 transition-colors"
-										>
-											<td className="px-2 py-2 text-sm text-gray-900 align-top">
-												<div className="max-w-3xl break-words">
-													{course.subject}
-												</div>
-											</td>
-											<td className="px-2 py-2 whitespace-nowrap text-sm text-gray-900">
-												{course.curriculum}/{course.sem}
-											</td>
-											<td className="px-2 py-2 whitespace-nowrap text-sm text-center">
-												<span
-													className={`font-medium ${
-														remainingDivisions === 0
-															? "text-green-600"
-															: "text-gray-900"
-													}`}
-												>
-													{course.divisions -
-														remainingDivisions}
-													/{course.divisions}
-												</span>
-											</td>
-											<td className="px-2 py-2 whitespace-nowrap text-sm text-center">
-												<span
-													className={`font-medium ${
-														remainingBatches === 0
-															? "text-green-600"
-															: "text-gray-900"
-													}`}
-												>
-													{course.batches -
-														remainingBatches}
-													/{course.batches}
-												</span>
-											</td>
-											<td className="px-2 py-2 whitespace-nowrap text-sm text-center">
-												<span
-													className={`font-medium ${
-														course.reqLectLoad === 0
-															? "text-green-600"
-															: "text-gray-900"
-													}`}
-												>
-													{course.reqLectLoad}/
-													{course.totalLectLoad}
-												</span>
-											</td>
-											<td className="px-2 py-2 whitespace-nowrap text-sm text-center">
-												<span
-													className={`font-medium ${
-														course.reqLabLoad === 0
-															? "text-green-600"
-															: "text-gray-900"
-													}`}
-												>
-													{course.reqLabLoad}/
-													{course.totalLabLoad}
-												</span>
-											</td>
-											<td className="px-2 py-2 whitespace-nowrap text-sm text-center">
-												<span
-													className={`font-medium ${
-														course.reqLectLoad +
-															course.reqLabLoad ===
-														0
-															? "text-green-600"
-															: "text-gray-900"
-													}`}
-												>
-													{course.reqLectLoad +
-														course.reqLabLoad}
-													/{course.totalLoad}
-												</span>
-											</td>
+      if (finalAssignments.length === 0) {
+        setMessage({
+          type: "warning",
+          text: "No new assignments to submit",
+        });
+        setLoading(false);
+        return;
+      }
 
-											{Array.from({ length: 6 }).map(
-												(_, index) => (
-													<td
-														key={index}
-														className="px-1 py-2"
-													>
-														<TeacherSelector
-															teachers={teachers}
-															courseId={
-																course._id
-															}
-															course={course}
-															remainingDivisions={
-																remainingDivisions
-															}
-															remainingBatches={
-																remainingBatches
-															}
-															onAssign={
-																handleAssignTeacher
-															}
-															getRemainingLoad={
-																getRemainingLoad
-															}
-															assignedTeachers={
-																assignedTeachers
-															}
-															disabled={
-																remainingDivisions ===
-																	0 &&
-																remainingBatches ===
-																	0
-															}
-															index={index}
-															assignments={
-																assignments
-															}
-															setAssignments={
-																setAssignments
-															}
-														/>
-													</td>
-												)
-											)}
-										</tr>
-									);
-								})}
+      const response = await fetch("/api/assignments/assign/multiple", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ assignments: finalAssignments }),
+      });
 
-								{courses.length === 0 && (
-									<tr>
-										<td
-											colSpan={13}
-											className="px-2 py-4 text-center text-sm text-gray-500"
-										>
-											{loading
-												? "Loading courses..."
-												: "No courses available"}
-										</td>
-									</tr>
-								)}
-							</tbody>
-						</table>
-					</div>
+      const data = await response.json();
 
-					<div className="mt-3 flex justify-center">
-						<div className="inline-flex rounded-md shadow-sm">
-							<button
-								onClick={() => fetchCourses(1)}
-								disabled={currentPage <= 1 || loading}
-								className="px-2 py-1 rounded-l-md border border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:bg-gray-50 disabled:text-gray-400"
-							>
-								First
-							</button>
-							<button
-								onClick={() => fetchCourses(currentPage - 1)}
-								disabled={currentPage <= 1 || loading}
-								className="px-2 py-1 border-t border-b border-r border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:bg-gray-50 disabled:text-gray-400"
-							>
-								Previous
-							</button>
-							<span className="px-2 py-1 border-t border-b border-gray-300 text-gray-700 font-medium bg-gray-100">
-								{currentPage} of {totalPages}
-							</span>
-							<button
-								onClick={() => fetchCourses(currentPage + 1)}
-								disabled={currentPage >= totalPages || loading}
-								className="px-2 py-1 border-t border-b border-r border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:bg-gray-50 disabled:text-gray-400"
-							>
-								Next
-							</button>
-							<button
-								onClick={() => fetchCourses(totalPages)}
-								disabled={currentPage >= totalPages || loading}
-								className="px-2 py-1 rounded-r-md border-t border-b border-r border-gray-300 text-gray-700 font-medium hover:bg-gray-100 disabled:bg-gray-50 disabled:text-gray-400"
-							>
-								Last
-							</button>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
+      if (data.success) {
+        setMessage({
+          type: "success",
+          text: data.message || "Teachers assigned successfully!",
+        });
+        // Refresh data after successful submission
+        fetchTeachers();
+        fetchCourses();
+      } else {
+        setMessage({
+          type: "error",
+          text: data.message || "Failed to assign teachers",
+        });
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to assign teachers" });
+      console.error("Error assigning teachers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Clear message after a delay
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        setMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  return (
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container mx-auto px-4 py-6">
+        <div className="bg-white rounded-xl shadow-md p-6">
+          {/* Header and Actions */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+            <h1 className="text-2xl font-bold text-gray-800">
+              Teacher Assignment System
+            </h1>
+            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+              <button
+                onClick={() => {
+                  fetchTeachers();
+                  fetchCourses();
+                }}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md flex items-center justify-center border border-gray-300 hover:bg-gray-200 transition-colors"
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader size={16} className="mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw size={16} className="mr-2" />
+                )}
+                Refresh
+              </button>
+              <button
+                onClick={handleSubmitAssignments}
+                disabled={assignments.filter(a => !a.original).length === 0 || loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center shadow-sm hover:bg-blue-700 transition-colors disabled:bg-blue-300"
+              >
+                <Save size={16} className="mr-2" />
+                {loading ? "Saving..." : "Save All Assignments"}
+              </button>
+            </div>
+          </div>
+
+          {/* Message Alert */}
+          {message && (
+            <div
+              className={`p-4 mb-6 rounded-lg border ${
+                message.type === "success"
+                  ? "bg-green-50 border-green-200 text-green-800"
+                  : message.type === "warning"
+                  ? "bg-yellow-50 border-yellow-200 text-yellow-800"
+                  : "bg-red-50 border-red-200 text-red-800"
+              } flex items-center`}
+            >
+              {message.type === "success" ? (
+                <Check size={18} className="mr-2 flex-shrink-0" />
+              ) : (
+                <AlertCircle size={18} className="mr-2 flex-shrink-0" />
+              )}
+              <span>{message.text}</span>
+              <button 
+                onClick={() => setMessage(null)} 
+                className="ml-auto text-gray-500 hover:text-gray-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Filters and Search Section */}
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <div className="w-full sm:w-1/2 xl:w-1/3">
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+                Search Course
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search size={16} className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  id="search"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  placeholder="Search by course name..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                />
+              </div>
+            </div>
+            <div className="w-full sm:w-1/2 xl:w-1/3">
+              <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-1">
+                Filter by Year
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Filter size={16} className="text-gray-400" />
+                </div>
+                <select
+                  id="year"
+                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  value={selectedYear}
+                  onChange={handleYearChange}
+                >
+                  <option value="">All Years</option>
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <ChevronDown size={16} className="text-gray-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Summary */}
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+              <p className="text-sm text-blue-600 font-medium">Total Courses</p>
+              <p className="text-xl font-bold text-blue-800">{allCourses.length}</p>
+            </div>
+            <div className="bg-green-50 border border-green-100 rounded-lg p-4">
+              <p className="text-sm text-green-600 font-medium">Showing Courses</p>
+              <p className="text-xl font-bold text-green-800">{filteredCourses.length}</p>
+            </div>
+            <div className="bg-purple-50 border border-purple-100 rounded-lg p-4">
+              <p className="text-sm text-purple-600 font-medium">Teachers Available</p>
+              <p className="text-xl font-bold text-purple-800">{teachers.length}</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+              <p className="text-sm text-amber-600 font-medium">New Assignments</p>
+              <p className="text-xl font-bold text-amber-800">
+                {assignments.filter(a => !a.original).length}
+              </p>
+            </div>
+          </div>
+
+          {/* Courses Table */}
+          <div className="overflow-x-auto rounded-lg border border-gray-200 shadow mb-6">
+            <table className="w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6"
+                  >
+                    Course
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/12"
+                  >
+                    Curr/Sem/Year
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
+                  >
+                    Divisions
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
+                  >
+                    Batches
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
+                  >
+                    Lect.
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
+                  >
+                    Lab
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
+                  >
+                    Total
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/2"
+                    colSpan={6}
+                  >
+                    Teacher Assignments
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredCourses.map((course) => {
+                  const remainingDivisions = getRemainingDivisions(course._id);
+                  const remainingBatches = getRemainingBatches(course._id);
+                  const assignedTeachers = getAssignedTeachers(course._id);
+                  const isFullyAssigned = remainingDivisions === 0 && remainingBatches === 0;
+
+                  return (
+                    <tr
+                      key={course._id}
+                      className={`hover:bg-gray-50 transition-colors ${
+                        isFullyAssigned ? "bg-green-50" : ""
+                      }`}
+                    >
+                      <td className="px-3 py-3 text-sm text-gray-900 align-top">
+                        <div className="max-w-xs break-words font-medium">{course.subject}</div>
+                        <div className="text-xs text-gray-500 mt-1">{course._id}</div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
+                        <span className="font-medium">{course.curriculum}/{course.sem}</span>
+                        <div className="text-xs text-gray-500 mt-1">Year: {course.year || "N/A"}</div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
+                        <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {course.divisions - remainingDivisions}/{course.divisions}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
+                        <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          {course.batches - remainingBatches}/{course.batches}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            course.reqLectLoad === 0
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {course.reqLectLoad}/{course.totalLectLoad}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            course.reqLabLoad === 0
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {course.reqLabLoad}/{course.totalLabLoad}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
+                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            course.reqLectLoad + course.reqLabLoad === 0
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {course.reqLectLoad + course.reqLabLoad}/{course.totalLoad}
+                        </div>
+                      </td>
+
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <td key={index} className="px-2 py-3">
+                          <TeacherSelector
+                            teachers={teachers}
+                            courseId={course._id}
+                            course={course}
+                            remainingDivisions={remainingDivisions}
+                            remainingBatches={remainingBatches}
+                            onAssign={handleAssignTeacher}
+                            getRemainingLoad={getRemainingLoad}
+                            assignedTeachers={assignedTeachers}
+                            disabled={isFullyAssigned}
+                            index={index}
+                            assignments={assignments}
+                            setAssignments={setAssignments}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+
+                {loading && filteredCourses.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={13}
+                      className="px-3 py-10 text-center text-sm text-gray-500"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <Loader className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                        <p>Loading courses...</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && filteredCourses.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={13}
+                      className="px-3 py-10 text-center text-sm text-gray-500"
+                    >
+                      <div className="flex flex-col items-center justify-center">
+                        <Info className="w-8 h-8 text-gray-400 mb-2" />
+                        <p>No courses available for the selected filters</p>
+                        {(selectedYear || searchQuery) && (
+                          <button
+                            onClick={clearFilters}
+                            className="mt-2 text-blue-600 hover:text-blue-800 underline text-sm"
+                          >
+                            Clear filters
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Load More Button */}
+          {hasMore && filteredCourses.length > 0 && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader size={16} className="inline mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Load More Courses"
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Course Count Summary */}
+          <div className="mt-6 text-center text-sm text-gray-500">
+            Showing {filteredCourses.length} out of {totalCourses} courses
+            {(selectedYear || searchQuery) && (
+              <span className="ml-2">
+                (Filtered by: {[
+                  selectedYear && `Year: ${selectedYear}`,
+                  searchQuery && `Search: "${searchQuery}"`
+                ].filter(Boolean).join(", ")})
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
-
 
 export default TeacherAssignment;
