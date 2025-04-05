@@ -29,7 +29,9 @@ const TeacherAssignment = () => {
   const [hasMore, setHasMore] = useState(true);
   const [totalCourses, setTotalCourses] = useState(0);
   const [yearOptions] = useState(['1st Year', '2nd Year', '3rd Year', '4th Year', 'MTech 1st Year', 'MTech 2nd Year']);
+  const [semOptions] = useState(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'MTDS-I', 'MTDS-II', 'MTCE-I', 'MTCE-II', 'MTIS-I', 'MTIS-II']);
   const [selectedYear, setSelectedYear] = useState("");
+  const [selectedSem, setSelectedSem] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [itemsPerPage] = useState(20); // Items to show per page for load more
@@ -108,13 +110,16 @@ const TeacherAssignment = () => {
   };
 
   // Apply filters to courses and handle pagination
-  const applyFiltersAndPagination = (sourceCourses = allCourses, page = 1, year = selectedYear, query = searchQuery) => {
+  const applyFiltersAndPagination = (sourceCourses = allCourses, page = 1, year = selectedYear, query = searchQuery, sem = selectedSem) => {
     // Apply filters
     let filtered = [...sourceCourses];
     
     // Filter by year if selected
     if (year) {
       filtered = filtered.filter(course => course.year === year);
+    }
+    if(sem){
+      filtered = filtered.filter(course => course.sem === sem); 
     }
     
     // Filter by search query if present
@@ -163,6 +168,12 @@ const TeacherAssignment = () => {
     setSelectedYear(year);
     applyFiltersAndPagination(allCourses, 1, year, searchQuery);
   };
+
+  const handleSemChange = (e) =>{
+    const sem = e.target.value;
+    setSelectedSem(sem);
+    applyFiltersAndPagination(allCourses, 1, selectedYear, searchQuery, sem);
+  }
 
   // Load more courses
   const handleLoadMore = () => {
@@ -549,6 +560,32 @@ const TeacherAssignment = () => {
                   {yearOptions.map((year) => (
                     <option key={year} value={year}>
                       {year}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <ChevronDown size={16} className="text-gray-400" />
+                </div>
+              </div>
+            </div>
+            <div className="w-full sm:w-1/2 xl:w-1/3">
+              <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-1">
+                Filter by Sem
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Filter size={16} className="text-gray-400" />
+                </div>
+                <select
+                  id="sem"
+                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  value={selectedSem}
+                  onChange={handleSemChange}
+                >
+                  <option value="">All Sems</option>
+                  {semOptions.map((sem) => (
+                    <option key={sem} value={sem}>
+                      {sem}
                     </option>
                   ))}
                 </select>
