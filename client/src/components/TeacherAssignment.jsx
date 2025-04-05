@@ -12,9 +12,11 @@ import {
   Plus,
   Search,
   Filter,
-  Loader
+  Loader,
+  User,
 } from "lucide-react";
 import TeacherSelector from "./TeacherSelector";
+import {useNavigate} from "react-router-dom";
 
 const TeacherAssignment = () => {
   const [teachers, setTeachers] = useState([]);
@@ -28,8 +30,31 @@ const TeacherAssignment = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalCourses, setTotalCourses] = useState(0);
-  const [yearOptions] = useState(['1st Year', '2nd Year', '3rd Year', '4th Year', 'MTech 1st Year', 'MTech 2nd Year']);
-  const [semOptions] = useState(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'MTDS-I', 'MTDS-II', 'MTCE-I', 'MTCE-II', 'MTIS-I', 'MTIS-II']);
+  const navigate = useNavigate();
+  const [yearOptions] = useState([
+    "1st Year",
+    "2nd Year",
+    "3rd Year",
+    "4th Year",
+    "MTech 1st Year",
+    "MTech 2nd Year",
+  ]);
+  const [semOptions] = useState([
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "MTDS-I",
+    "MTDS-II",
+    "MTCE-I",
+    "MTCE-II",
+    "MTIS-I",
+    "MTIS-II",
+  ]);
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSem, setSelectedSem] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -64,7 +89,7 @@ const TeacherAssignment = () => {
     try {
       // Fetch all courses at once
       let url = `/api/courses?limit=200&page=1`;
-      
+
       const response = await fetch(url);
       const data = await response.json();
 
@@ -73,7 +98,7 @@ const TeacherAssignment = () => {
         const coursesData = data.data;
         setAllCourses(coursesData);
         setTotalCourses(coursesData.length);
-        
+
         // Apply initial filtering
         applyFiltersAndPagination(coursesData);
 
@@ -88,7 +113,7 @@ const TeacherAssignment = () => {
                 teacherId: a.teacherId._id,
                 divisions: a.divisions,
                 batches: a.batches,
-                original: true
+                original: true,
               })),
             ];
           }
@@ -110,35 +135,43 @@ const TeacherAssignment = () => {
   };
 
   // Apply filters to courses and handle pagination
-  const applyFiltersAndPagination = (sourceCourses = allCourses, page = 1, year = selectedYear, query = searchQuery, sem = selectedSem) => {
+  const applyFiltersAndPagination = (
+    sourceCourses = allCourses,
+    page = 1,
+    year = selectedYear,
+    query = searchQuery,
+    sem = selectedSem
+  ) => {
     // Apply filters
     let filtered = [...sourceCourses];
-    
+
     // Filter by year if selected
     if (year) {
-      filtered = filtered.filter(course => course.year === year);
+      filtered = filtered.filter((course) => course.year === year);
     }
-    if(sem){
-      filtered = filtered.filter(course => course.sem === sem); 
+    if (sem) {
+      filtered = filtered.filter((course) => course.sem === sem);
     }
-    
+
     // Filter by search query if present
     if (query) {
       const lowerQuery = query.toLowerCase();
-      filtered = filtered.filter(course => 
-        course.subject.toLowerCase().includes(lowerQuery) || 
-        course._id.toLowerCase().includes(lowerQuery) ||
-        (course.curriculum && course.curriculum.toLowerCase().includes(lowerQuery))
+      filtered = filtered.filter(
+        (course) =>
+          course.subject.toLowerCase().includes(lowerQuery) ||
+          course._id.toLowerCase().includes(lowerQuery) ||
+          (course.curriculum &&
+            course.curriculum.toLowerCase().includes(lowerQuery))
       );
     }
-    
+
     // Calculate total after filtering
     setTotalCourses(filtered.length);
-    
+
     // Apply pagination for load more
     const endIndex = page * itemsPerPage;
     const paginatedCourses = filtered.slice(0, endIndex);
-    
+
     // Update state
     setCourses(paginatedCourses);
     setFilteredCourses(paginatedCourses);
@@ -150,15 +183,15 @@ const TeacherAssignment = () => {
   const handleSearchChange = (e) => {
     const query = e.target.value;
     setSearchQuery(query);
-    
+
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
-    
+
     const timeout = setTimeout(() => {
       applyFiltersAndPagination(allCourses, 1, selectedYear, query);
     }, 300); // 300ms debounce
-    
+
     setSearchTimeout(timeout);
   };
 
@@ -169,11 +202,11 @@ const TeacherAssignment = () => {
     applyFiltersAndPagination(allCourses, 1, year, searchQuery);
   };
 
-  const handleSemChange = (e) =>{
+  const handleSemChange = (e) => {
     const sem = e.target.value;
     setSelectedSem(sem);
     applyFiltersAndPagination(allCourses, 1, selectedYear, searchQuery, sem);
-  }
+  };
 
   // Load more courses
   const handleLoadMore = () => {
@@ -486,8 +519,16 @@ const TeacherAssignment = () => {
                 Refresh
               </button>
               <button
+                onClick={()=>navigate("/teachers")}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center shadow-sm hover:bg-blue-700 transition-colors disabled:bg-blue-300"
+              >
+                <User size={16} className="mr-2" /> View Teachers
+              </button>
+              <button
                 onClick={handleSubmitAssignments}
-                disabled={assignments.filter(a => !a.original).length === 0 || loading}
+                disabled={
+                  assignments.filter((a) => !a.original).length === 0 || loading
+                }
                 className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center shadow-sm hover:bg-blue-700 transition-colors disabled:bg-blue-300"
               >
                 <Save size={16} className="mr-2" />
@@ -513,8 +554,8 @@ const TeacherAssignment = () => {
                 <AlertCircle size={18} className="mr-2 flex-shrink-0" />
               )}
               <span>{message.text}</span>
-              <button 
-                onClick={() => setMessage(null)} 
+              <button
+                onClick={() => setMessage(null)}
                 className="ml-auto text-gray-500 hover:text-gray-700"
               >
                 <X size={16} />
@@ -525,7 +566,10 @@ const TeacherAssignment = () => {
           {/* Filters and Search Section */}
           <div className="mb-6 flex flex-col sm:flex-row gap-4">
             <div className="w-full sm:w-1/2 xl:w-1/3">
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="search"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Search Course
               </label>
               <div className="relative">
@@ -543,7 +587,10 @@ const TeacherAssignment = () => {
               </div>
             </div>
             <div className="w-full sm:w-1/2 xl:w-1/3">
-              <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="year"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Filter by Year
               </label>
               <div className="relative">
@@ -569,7 +616,10 @@ const TeacherAssignment = () => {
               </div>
             </div>
             <div className="w-full sm:w-1/2 xl:w-1/3">
-              <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="year"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Filter by Sem
               </label>
               <div className="relative">
@@ -600,20 +650,32 @@ const TeacherAssignment = () => {
           <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
               <p className="text-sm text-blue-600 font-medium">Total Courses</p>
-              <p className="text-xl font-bold text-blue-800">{allCourses.length}</p>
+              <p className="text-xl font-bold text-blue-800">
+                {allCourses.length}
+              </p>
             </div>
             <div className="bg-green-50 border border-green-100 rounded-lg p-4">
-              <p className="text-sm text-green-600 font-medium">Showing Courses</p>
-              <p className="text-xl font-bold text-green-800">{filteredCourses.length}</p>
+              <p className="text-sm text-green-600 font-medium">
+                Showing Courses
+              </p>
+              <p className="text-xl font-bold text-green-800">
+                {filteredCourses.length}
+              </p>
             </div>
             <div className="bg-purple-50 border border-purple-100 rounded-lg p-4">
-              <p className="text-sm text-purple-600 font-medium">Teachers Available</p>
-              <p className="text-xl font-bold text-purple-800">{teachers.length}</p>
+              <p className="text-sm text-purple-600 font-medium">
+                Teachers Available
+              </p>
+              <p className="text-xl font-bold text-purple-800">
+                {teachers.length}
+              </p>
             </div>
             <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
-              <p className="text-sm text-amber-600 font-medium">New Assignments</p>
+              <p className="text-sm text-amber-600 font-medium">
+                New Assignments
+              </p>
               <p className="text-xl font-bold text-amber-800">
-                {assignments.filter(a => !a.original).length}
+                {assignments.filter((a) => !a.original).length}
               </p>
             </div>
           </div>
@@ -679,7 +741,8 @@ const TeacherAssignment = () => {
                   const remainingDivisions = getRemainingDivisions(course._id);
                   const remainingBatches = getRemainingBatches(course._id);
                   const assignedTeachers = getAssignedTeachers(course._id);
-                  const isFullyAssigned = remainingDivisions === 0 && remainingBatches === 0;
+                  const isFullyAssigned =
+                    remainingDivisions === 0 && remainingBatches === 0;
 
                   return (
                     <tr
@@ -689,16 +752,25 @@ const TeacherAssignment = () => {
                       }`}
                     >
                       <td className="px-3 py-3 text-sm text-gray-900 align-top">
-                        <div className="max-w-xs break-words font-medium">{course.subject}</div>
-                        <div className="text-xs text-gray-500 mt-1">{course._id}</div>
+                        <div className="max-w-xs break-words font-medium">
+                          {course.subject}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {course._id}
+                        </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900">
-                        <span className="font-medium">{course.curriculum}/{course.sem}</span>
-                        <div className="text-xs text-gray-500 mt-1">Year: {course.year || "N/A"}</div>
+                        <span className="font-medium">
+                          {course.curriculum}/{course.sem}
+                        </span>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Year: {course.year || "N/A"}
+                        </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
                         <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {course.divisions - remainingDivisions}/{course.divisions}
+                          {course.divisions - remainingDivisions}/
+                          {course.divisions}
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
@@ -707,7 +779,8 @@ const TeacherAssignment = () => {
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
-                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        <div
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             course.reqLectLoad === 0
                               ? "bg-green-100 text-green-800"
                               : "bg-yellow-100 text-yellow-800"
@@ -717,7 +790,8 @@ const TeacherAssignment = () => {
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
-                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        <div
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             course.reqLabLoad === 0
                               ? "bg-green-100 text-green-800"
                               : "bg-yellow-100 text-yellow-800"
@@ -727,13 +801,15 @@ const TeacherAssignment = () => {
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
-                        <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        <div
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             course.reqLectLoad + course.reqLabLoad === 0
                               ? "bg-green-100 text-green-800"
                               : "bg-yellow-100 text-yellow-800"
                           }`}
                         >
-                          {course.reqLectLoad + course.reqLabLoad}/{course.totalLoad}
+                          {course.reqLectLoad + course.reqLabLoad}/
+                          {course.totalLoad}
                         </div>
                       </td>
 
@@ -823,10 +899,14 @@ const TeacherAssignment = () => {
             Showing {filteredCourses.length} out of {totalCourses} courses
             {(selectedYear || searchQuery) && (
               <span className="ml-2">
-                (Filtered by: {[
+                (Filtered by:{" "}
+                {[
                   selectedYear && `Year: ${selectedYear}`,
-                  searchQuery && `Search: "${searchQuery}"`
-                ].filter(Boolean).join(", ")})
+                  searchQuery && `Search: "${searchQuery}"`,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                )
               </span>
             )}
           </div>
