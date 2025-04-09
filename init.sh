@@ -1,12 +1,19 @@
 #!/bin/bash
 
-sudo apt install tmux
-sudo apt install nodejs
-sudo apt install npm
-sudo npm install -g nodemon
+sudo apt update
+sudo apt install -y tmux nodejs npm mongodb
 
-cd server
+cd server || exit
 touch .env
-printf "MONGO_URI=mongodb://localhost:27017/course_management_test
-PORT=5000\n" >> .env
-cd ..
+cat <<EOF > .env
+MONGO_URI=mongodb://localhost:27017/course_management_test
+PORT=5000
+EOF
+
+npm install
+
+cd ../client || exit
+npm install
+
+echo "Environment setup complete."
+
