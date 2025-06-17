@@ -37,11 +37,10 @@ const calculateDivisions = (year) => {
 };
 
 const transformRowToCourse = (row) => {
+    console.log(row);
     if (!row.Subject || row.Subject.trim() === '') {
         return null;
     }
-
-    // console.log(Object.keys(row));
 
     const sem = row.Sem;
     const year = determineYear(sem);
@@ -73,8 +72,10 @@ const transformRowToCourse = (row) => {
     };
 };
 
+
 const processExcelFile = (buffer) => {
     const workbook = xlsx.read(buffer, { type: 'buffer' });
+    console.log(workbook.SheetNames);
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const jsonData = xlsx.utils.sheet_to_json(worksheet);
 
@@ -102,6 +103,7 @@ const importCourses = async (req, res) => {
         // const insertedCourses = await Course.insertMany(coursesData);
 
         await Course.insertMany(coursesData);
+        console.log(`Imported ${coursesData.length} courses successfully.`);
 
         return res.status(200).json({
             success: true,
@@ -130,13 +132,18 @@ const getCourses = async (req, res) => {
             .limit(limit)
             .populate({
                 path: 'assignments',
-                select: 'teacherId divisions batches lectureLoad labLoad',
+                select: '_id teacherId divisions batches lectureLoad labLoad',
                 populate: {
                     path: 'teacherId',
                     select: 'name position loadLimit assignedLoad status'
                 }
             })
             .lean();
+        for(const course of courses) {
+            if (course.assignments && course.assignments.length > 0) {
+                console.log(course.assignments);
+            }
+        }
 
         const totalCourses = await Course.countDocuments();
         const totalPages = Math.ceil(totalCourses / limit);

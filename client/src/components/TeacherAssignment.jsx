@@ -16,12 +16,12 @@ import {
   User,
 } from "lucide-react";
 import TeacherSelector from "./TeacherSelector";
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const TeacherAssignment = () => {
   const [teachers, setTeachers] = useState([]);
-  const [allCourses, setAllCourses] = useState([]); // Store all courses
-  const [courses, setCourses] = useState([]); // Store filtered courses
+  const [allCourses, setAllCourses] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [filteredCourses, setFilteredCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -30,7 +30,12 @@ const TeacherAssignment = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalCourses, setTotalCourses] = useState(0);
+  const [isSaveDisabled, setIsSaveDisabled] = useState(true);
+  const [deletedAssignments, setDeletedAssignments] = useState([]);
+
   const navigate = useNavigate();
+
+
   const [yearOptions] = useState([
     "1st Year",
     "2nd Year",
@@ -55,11 +60,13 @@ const TeacherAssignment = () => {
     "MTIS-I",
     "MTIS-II",
   ]);
+
+  // filter options
   const [selectedYear, setSelectedYear] = useState("");
   const [selectedSem, setSelectedSem] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTimeout, setSearchTimeout] = useState(null);
-  const [itemsPerPage] = useState(20); // Items to show per page for load more
+  const [itemsPerPage] = useState(20);
 
   // =========================================FETCH DATA FUNCTIONS ===============================================
   const fetchTeachers = async () => {
@@ -87,28 +94,25 @@ const TeacherAssignment = () => {
   const fetchCourses = async () => {
     setLoading(true);
     try {
-      // Fetch all courses at once
       let url = `/api/courses?limit=200&page=1`;
 
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.success) {
-        // Store all courses
         const coursesData = data.data;
         setAllCourses(coursesData);
         setTotalCourses(coursesData.length);
 
-        // Apply initial filtering
         applyFiltersAndPagination(coursesData);
 
-        // Process all assignments from courses
         let _assignments = [];
         coursesData.forEach((course) => {
           if (course.assignments && Array.isArray(course.assignments)) {
             _assignments = [
               ..._assignments,
               ...course.assignments.map((a) => ({
+                _id: a._id,
                 courseId: course._id,
                 teacherId: a.teacherId._id,
                 divisions: a.divisions,
@@ -134,7 +138,6 @@ const TeacherAssignment = () => {
     }
   };
 
-  // Apply filters to courses and handle pagination
   const applyFiltersAndPagination = (
     sourceCourses = allCourses,
     page = 1,
@@ -142,10 +145,8 @@ const TeacherAssignment = () => {
     query = searchQuery,
     sem = selectedSem
   ) => {
-    // Apply filters
     let filtered = [...sourceCourses];
 
-    // Filter by year if selected
     if (year) {
       filtered = filtered.filter((course) => course.year === year);
     }
@@ -153,7 +154,6 @@ const TeacherAssignment = () => {
       filtered = filtered.filter((course) => course.sem === sem);
     }
 
-    // Filter by search query if present
     if (query) {
       const lowerQuery = query.toLowerCase();
       filtered = filtered.filter(
@@ -165,21 +165,17 @@ const TeacherAssignment = () => {
       );
     }
 
-    // Calculate total after filtering
     setTotalCourses(filtered.length);
 
-    // Apply pagination for load more
     const endIndex = page * itemsPerPage;
     const paginatedCourses = filtered.slice(0, endIndex);
 
-    // Update state
     setCourses(paginatedCourses);
     setFilteredCourses(paginatedCourses);
     setCurrentPage(page);
     setHasMore(endIndex < filtered.length);
   };
 
-  // Handle search input with debounce
   const handleSearchChange = (e) => {
     const query = e.target.value;
     setSearchQuery(query);
@@ -190,12 +186,10 @@ const TeacherAssignment = () => {
 
     const timeout = setTimeout(() => {
       applyFiltersAndPagination(allCourses, 1, selectedYear, query);
-    }, 300); // 300ms debounce
-
+    }, 300);
     setSearchTimeout(timeout);
   };
 
-  // Handle year filter change
   const handleYearChange = (e) => {
     const year = e.target.value;
     setSelectedYear(year);
@@ -208,13 +202,11 @@ const TeacherAssignment = () => {
     applyFiltersAndPagination(allCourses, 1, selectedYear, searchQuery, sem);
   };
 
-  // Load more courses
   const handleLoadMore = () => {
     const nextPage = currentPage + 1;
     applyFiltersAndPagination(allCourses, nextPage, selectedYear, searchQuery);
   };
 
-  // Clear all filters
   const clearFilters = () => {
     setSelectedYear("");
     setSearchQuery("");
@@ -233,31 +225,44 @@ const TeacherAssignment = () => {
     setLoading(true);
 
     try {
+      // try to find an existing assignment
       const existingAssignment = assignments.find(
         (assignment) =>
           assignment?.courseId === courseId &&
           assignment?.teacherId === teacherId
       );
 
+      // if an assignment already exists, update it
       if (existingAssignment) {
-        // Update existing assignment
+        console.log("Updating existing assignment:", existingAssignment);
+
+        // update the assignments state with the new assignment
+        // with updated divisions and batches
         const updatedAssignments = assignments.map((assignment) => {
           if (
             assignment?.courseId === courseId &&
             assignment?.teacherId === teacherId
           ) {
-            return { ...assignment, divisions, batches };
+            return { ...assignment, divisions, batches, original: false };
           }
           return assignment;
         });
         setAssignments(updatedAssignments);
 
-        // Update teachers and courses state variables
+        // update the courses and teachers state
+
+        // for context
+        // courses -> courses that are displayed in the table (paginated)
+        // allCourses -> all courses fetched from the server
         const course = allCourses.find((course) => course._id === courseId);
         const updatedTeachers = teachers.map((teacher) => {
           if (teacher._id === teacherId) {
             return {
               ...teacher,
+
+              // update the assigned load of the teacher
+              // by subtracting the existing assignment's divisions and batches load
+              // and adding the new divisions and batches load
               assignedLoad:
                 teacher.assignedLoad -
                 existingAssignment.divisions * course.lectHrs -
@@ -269,7 +274,9 @@ const TeacherAssignment = () => {
           return teacher;
         });
 
-        // Update all courses including those not currently displayed
+        // we are updating two states independently which have the same data
+        // but i guess its all right cause its offline and we are not using
+        // any database to store the assignments
         const updatedAllCourses = allCourses.map((course) => {
           if (course._id === courseId) {
             return {
@@ -287,11 +294,14 @@ const TeacherAssignment = () => {
           return course;
         });
 
-        // Update displayed courses
         const updatedCourses = courses.map((course) => {
           if (course._id === courseId) {
             return {
               ...course,
+              // reqLectLoad and reqLabLoad are essentially the load that is pending to be assigned
+              // so when we update the assignment:
+              // 1. we need to add the existing assignment's load back (which was previously subtracted )
+              // 2. we need to subtract the new assignment's load
               reqLectLoad:
                 course.reqLectLoad +
                 existingAssignment.divisions * course.lectHrs -
@@ -309,8 +319,13 @@ const TeacherAssignment = () => {
         setAllCourses(updatedAllCourses);
         setCourses(updatedCourses);
         setFilteredCourses(updatedCourses);
-      } else {
-        // Create new assignment
+
+        setIsSaveDisabled(false);
+        console.log("Assignment updated successfully");
+      }
+
+      // if no assignment exists, create a new one
+      else {
         const newAssignment = {
           courseId,
           teacherId,
@@ -321,7 +336,6 @@ const TeacherAssignment = () => {
         const updatedAssignments = [...assignments, newAssignment];
         setAssignments(updatedAssignments);
 
-        // Update teachers and courses state variables
         const course = allCourses.find((course) => course._id === courseId);
 
         const updatedTeachers = teachers.map((teacher) => {
@@ -337,7 +351,6 @@ const TeacherAssignment = () => {
           return teacher;
         });
 
-        // Update all courses including those not currently displayed
         const updatedAllCourses = allCourses.map((course) => {
           if (course._id === courseId) {
             return {
@@ -349,7 +362,6 @@ const TeacherAssignment = () => {
           return course;
         });
 
-        // Update displayed courses
         const updatedCourses = courses.map((course) => {
           if (course._id === courseId) {
             return {
@@ -367,7 +379,6 @@ const TeacherAssignment = () => {
         setFilteredCourses(updatedCourses);
       }
 
-      // Show success message
       setMessage({
         type: "success",
         text: "Assignment updated successfully",
@@ -380,7 +391,111 @@ const TeacherAssignment = () => {
     }
   };
 
+  const handleDeleteAssignment = (courseId, teacherId) => {
+
+    setLoading(true);
+    try {
+      // find the assignment to delete
+      const assignmentToDelete = assignments.find(
+        (assignment) =>
+          assignment.courseId === courseId && assignment.teacherId === teacherId
+      );
+
+      if (!assignmentToDelete) {
+        setMessage({
+          type: "warning",
+          text: "No assignment found to delete",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // update the assignments state by filtering out the deleted assignment
+      const updatedAssignments = assignments.filter(
+        (assignment) =>
+          !(assignment.courseId === courseId && assignment.teacherId === teacherId)
+      );
+      setAssignments(updatedAssignments);
+
+      // update the courses and teachers state
+      const course = allCourses.find((course) => course._id === courseId);
+      const updatedTeachers = teachers.map((teacher) => {
+        if (teacher._id === teacherId) {
+          return {
+            ...teacher,
+            assignedLoad:
+              teacher.assignedLoad -
+              (assignmentToDelete.divisions * course.lectHrs +
+                assignmentToDelete.batches * course.labHrs),
+          };
+        }
+        return teacher;
+      });
+
+      const updatedAllCourses = allCourses.map((course) => {
+        if (course._id === courseId) {
+          return {
+            ...course,
+            reqLectLoad:
+              course.reqLectLoad + assignmentToDelete.divisions * course.lectHrs,
+            reqLabLoad:
+              course.reqLabLoad + assignmentToDelete.batches * course.labHrs,
+          };
+        }
+        return course;
+      });
+
+      const updatedCourses = courses.map((course) => {
+        if (course._id === courseId) {
+          return {
+            ...course,
+            reqLectLoad:
+              course.reqLectLoad + assignmentToDelete.divisions * course.lectHrs,
+            reqLabLoad:
+              course.reqLabLoad + assignmentToDelete.batches * course.labHrs,
+          };
+        }
+        return course;
+      });
+
+      setTeachers(updatedTeachers);
+      setAllCourses(updatedAllCourses);
+      setCourses(updatedCourses);
+      setFilteredCourses(updatedCourses);
+
+      // add the deleted assignment to the deletedAssignments state
+      // backend only needs to be updated if the assignment has an _id
+      // (or it was already saved to the database)
+      if(assignmentToDelete._id) {
+        setDeletedAssignments((prev) => [
+          ...prev,
+          assignmentToDelete,
+        ]);
+      }
+
+      setMessage({
+        type: "success",
+        text: "Assignment deleted successfully",
+      });
+    } catch (e) {
+      console.error("Error deleting assignment:", e);
+      setMessage({ type: "error", text: "Failed to delete assignment" });
+    }finally{
+      setLoading(false);
+      setIsSaveDisabled(false); // enable save button after deletion
+    }
+  }
+
   // ==================================================================================================
+
+  // ALL THESE FUNCTIONS PULL DATA FROM THE COURSES STATE VARIABLE THEY DO NOT CALCULATE DATA ON THE FLY 
+  // I SUPPOSE THAT IS RESPONSIBILITY OF THE TEACHER SELECTOR COMPONENT 
+
+  // this getRemainingDivisions function calculates the remaining divisions for a course
+  // it pulls the data from the state variable and it is not dynamic when we use it to 
+  // control input to load 
+  // it can be used as the inital value for the input field but we have to keep extra state 
+  // in teacher selector component to control the input value
   const getRemainingDivisions = (courseId) => {
     const course = allCourses.find((c) => c._id === courseId);
     if (!course) return 0;
@@ -396,6 +511,9 @@ const TeacherAssignment = () => {
     return course.divisions - assignedDivisions;
   };
 
+  // this getRemainingBatches has the same story as getRemainingDivisions
+  // so again only initial state selector component needs to have its own 
+  // logic to set clamped value for the input field
   const getRemainingBatches = (courseId) => {
     const course = allCourses.find((c) => c._id === courseId);
     if (!course) return 0;
@@ -435,10 +553,17 @@ const TeacherAssignment = () => {
     return teacher.loadLimit - assignedLoad;
   };
 
-  // ==================================================================================================
-
+  // ======================================================SUBMIT FUNCTION============================================
   const handleSubmitAssignments = async () => {
     setLoading(true);
+    if(deletedAssignments.length > 0) {
+      setMessage({
+        type: "info",
+        text: "Submitting deleted assignments...",
+      });
+      await submitDeletedAssignments();
+    }
+
     try {
       const finalAssignments = assignments.filter((a) => a.original !== true);
 
@@ -466,7 +591,8 @@ const TeacherAssignment = () => {
           type: "success",
           text: data.message || "Teachers assigned successfully!",
         });
-        // Refresh data after successful submission
+
+        // refresh data after successful submission
         fetchTeachers();
         fetchCourses();
       } else {
@@ -480,10 +606,59 @@ const TeacherAssignment = () => {
       console.error("Error assigning teachers:", error);
     } finally {
       setLoading(false);
+      setIsSaveDisabled(true);
     }
   };
 
-  // Clear message after a delay
+  const submitDeletedAssignments = async () => {
+    setLoading(true);
+    try {
+      if (deletedAssignments.length === 0) {
+        setMessage({
+          type: "warning",
+          text: "No deleted assignments to submit",
+        });
+        setLoading(false);
+        return;
+      }
+
+      const deletedAssignmentIds = deletedAssignments.map((a) => a._id);
+
+      const response = await fetch("/api/assignments/delete-multiple", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ assignmentIds: deletedAssignmentIds }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setMessage({
+          type: "success",
+          text: data.message || "Assignments deleted successfully!",
+        });
+
+        // refresh data after successful submission
+        fetchTeachers();
+        fetchCourses();
+      } else {
+        setMessage({
+          type: "error",
+          text: data.message || "Failed to delete assignments",
+        });
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to delete assignments" });
+      console.error("Error deleting assignments:", error);
+    } finally {
+      setLoading(false);
+      setIsSaveDisabled(true);
+    }
+  };
+
+  // clear message after a delay
   useEffect(() => {
     if (message) {
       const timer = setTimeout(() => {
@@ -519,7 +694,7 @@ const TeacherAssignment = () => {
                 Refresh
               </button>
               <button
-                onClick={()=>navigate("/teachers")}
+                onClick={() => navigate("/teachers")}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center shadow-sm hover:bg-blue-700 transition-colors disabled:bg-blue-300"
               >
                 <User size={16} className="mr-2" /> View Teachers
@@ -527,7 +702,7 @@ const TeacherAssignment = () => {
               <button
                 onClick={handleSubmitAssignments}
                 disabled={
-                  assignments.filter((a) => !a.original).length === 0 || loading
+                  (isSaveDisabled) && (assignments.filter((a) => !a.original).length === 0 || loading)
                 }
                 className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center shadow-sm hover:bg-blue-700 transition-colors disabled:bg-blue-300"
               >
@@ -540,13 +715,12 @@ const TeacherAssignment = () => {
           {/* Message Alert */}
           {message && (
             <div
-              className={`p-4 mb-6 rounded-lg border ${
-                message.type === "success"
-                  ? "bg-green-50 border-green-200 text-green-800"
-                  : message.type === "warning"
+              className={`p-4 mb-6 rounded-lg border ${message.type === "success"
+                ? "bg-green-50 border-green-200 text-green-800"
+                : message.type === "warning"
                   ? "bg-yellow-50 border-yellow-200 text-yellow-800"
                   : "bg-red-50 border-red-200 text-red-800"
-              } flex items-center`}
+                } flex items-center`}
             >
               {message.type === "success" ? (
                 <Check size={18} className="mr-2 flex-shrink-0" />
@@ -747,9 +921,8 @@ const TeacherAssignment = () => {
                   return (
                     <tr
                       key={course._id}
-                      className={`hover:bg-gray-50 transition-colors ${
-                        isFullyAssigned ? "bg-green-50" : ""
-                      }`}
+                      className={`hover:bg-gray-50 transition-colors ${isFullyAssigned ? "bg-green-50" : ""
+                        }`}
                     >
                       <td className="px-3 py-3 text-sm text-gray-900 align-top">
                         <div className="max-w-xs break-words font-medium">
@@ -780,33 +953,30 @@ const TeacherAssignment = () => {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
                         <div
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            course.reqLectLoad === 0
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${course.reqLectLoad === 0
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                            }`}
                         >
                           {course.reqLectLoad}/{course.totalLectLoad}
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
                         <div
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            course.reqLabLoad === 0
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${course.reqLabLoad === 0
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                            }`}
                         >
                           {course.reqLabLoad}/{course.totalLabLoad}
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
                         <div
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            course.reqLectLoad + course.reqLabLoad === 0
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${course.reqLectLoad + course.reqLabLoad === 0
+                            ? "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                            }`}
                         >
                           {course.reqLectLoad + course.reqLabLoad}/
                           {course.totalLoad}
@@ -819,6 +989,8 @@ const TeacherAssignment = () => {
                             teachers={teachers}
                             courseId={course._id}
                             course={course}
+                            setCourses={setCourses}
+                            setTeachers={setTeachers}
                             remainingDivisions={remainingDivisions}
                             remainingBatches={remainingBatches}
                             onAssign={handleAssignTeacher}
@@ -828,6 +1000,7 @@ const TeacherAssignment = () => {
                             index={index}
                             assignments={assignments}
                             setAssignments={setAssignments}
+                            onDelete={handleDeleteAssignment}
                           />
                         </td>
                       ))}
