@@ -2,6 +2,7 @@ const { Readable } = require('stream');
 const csv = require('csv-parser');
 const Teacher = require('../models/teacherModel');
 const Assignment = require('../models/assignmentModel');
+const mongoose = require('mongoose');
 
 const transformRowToTeacher = (row) => {
     if (!row['Name'] || row['Name'].trim() === '') {
@@ -185,8 +186,53 @@ const getTeacher = async (req, res) => {
     }
 };
 
+const updateTeacher = async (req, res) => {
+    try {
+        const teacherId = req.params.teacherId;
+        const { name, position, loadLimit } = req.body;
+        
+        if (!teacherId || !mongoose.Types.ObjectId.isValid(teacherId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid teacher ID",
+                data: null
+            });
+        }
+        
+        const updateData = {};
+        if (name) updateData.name = name.trim();
+        if (position) updateData.position = position.trim();
+        if (loadLimit !== undefined) updateData.loadLimit = parseFloat(loadLimit);
+        
+        const updatedTeacher = await Teacher.findByIdAndUpdate(teacherId, updateData, { new: true }).lean();
+        
+        if (!updatedTeacher) {
+            return res.status(404).json({
+                success: false,
+                message: "Teacher not found!",
+                data: null
+            });
+        }
+        
+        return res.status(200).json({
+            success: true,
+            message: "Teacher updated successfully!",
+            data: updatedTeacher
+        });
+    } catch (e) {
+        console.log(e.message);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update teacher",
+            error: e.message,
+            data: null
+        });
+    }
+};
+
 module.exports = {
 	importTeachers,
 	getTeacher,
-	getTeachers
+	getTeachers,
+    updateTeacher
 };

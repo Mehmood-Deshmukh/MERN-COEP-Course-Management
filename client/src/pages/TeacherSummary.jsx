@@ -96,8 +96,10 @@ const TeacherSummary = () => {
         return;
       }
 
-      const response = await axios.put(`/api/teachers/${teacher._id}`, {
-        loadLimit: loadValue
+      const response = await axios.put(`/api/teachers/update/${teacher._id}`, {
+        loadLimit: loadValue,
+        name: teacher.name,
+        position: teacher.position,
       });
 
       if (response.data.success) {
@@ -506,13 +508,6 @@ const TeacherSummary = () => {
                           <span className="text-sm font-medium text-gray-700">
                             {teacher.assignedLoad} / {teacher.loadLimit}
                           </span>
-                          <button 
-                            onClick={(e) => startEditingTeacherLoad(teacher, e)} 
-                            className="ml-1 text-blue-500 hover:text-blue-700"
-                            aria-label="Edit teacher load"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
                         </div>
                         <div className="w-24 bg-gray-200 rounded-full h-2 mt-1">
                           <div 
@@ -576,7 +571,7 @@ const TeacherSummary = () => {
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.5"
+                                  step="1"
                                   value={newLoadLimit}
                                   onChange={(e) => setNewLoadLimit(e.target.value)}
                                   className="text-xl font-bold w-20 border-b-2 border-blue-500 focus:outline-none bg-transparent"
