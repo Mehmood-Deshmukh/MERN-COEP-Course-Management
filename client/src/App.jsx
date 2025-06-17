@@ -14,9 +14,7 @@ function App() {
             <EnhancedSidebarUpload />
             <Routes>
                 <Route path="/" element={<Assignment />} />
-                <Route path="/courses" element={<TeacherAssignmentSystem />} />
                 <Route path="/teachers" element={<TeacherSummary />} />
-                <Route path="/assignments" element={<TeacherAssignmentSystem />} />
             </Routes>
             {/* <TeacherSummary /> */}
         </>

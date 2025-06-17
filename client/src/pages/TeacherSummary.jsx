@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, User, Calendar, BookOpen, Clock, CircleCheck, AlertCircle, ChevronDown, ChevronUp, Search, Filter, Download } from 'lucide-react';
+import { Users, User, Calendar, BookOpen, Clock, CircleCheck, AlertCircle, ChevronDown, ChevronUp, Search, Filter, Download, ArrowLeft, Edit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 
@@ -11,6 +12,10 @@ const TeacherSummary = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedTeacher, setExpandedTeacher] = useState(null);
+  const [editingTeacher, setEditingTeacher] = useState(null);
+  const [newLoadLimit, setNewLoadLimit] = useState('');
+  
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -63,6 +68,61 @@ const TeacherSummary = () => {
 
   const toggleTeacherExpand = (teacherId) => {
     setExpandedTeacher(expandedTeacher === teacherId ? null : teacherId);
+    // Close any open edit form when collapsing or expanding another teacher
+    if (editingTeacher && editingTeacher !== teacherId) {
+      setEditingTeacher(null);
+      setNewLoadLimit('');
+    }
+  };
+
+  const startEditingTeacherLoad = (teacher, e) => {
+    e.stopPropagation(); // Prevent triggering the expand/collapse
+    setEditingTeacher(teacher._id);
+    setNewLoadLimit(teacher.loadLimit.toString());
+  };
+
+  const cancelEditingTeacherLoad = (e) => {
+    e.stopPropagation(); // Prevent triggering the expand/collapse
+    setEditingTeacher(null);
+    setNewLoadLimit('');
+  };
+
+  const saveTeacherLoad = async (teacher, e) => {
+    e.stopPropagation(); // Prevent triggering the expand/collapse
+    try {
+      const loadValue = parseFloat(newLoadLimit);
+      if (isNaN(loadValue) || loadValue < 0) {
+        alert('Please enter a valid load value');
+        return;
+      }
+
+      const response = await axios.put(`/api/teachers/${teacher._id}`, {
+        loadLimit: loadValue
+      });
+
+      if (response.data.success) {
+        // Update the teacher in the state
+        const updatedTeachers = teachers.map(t => {
+          if (t._id === teacher._id) {
+            return {
+              ...t,
+              loadLimit: loadValue,
+              remainingLoad: loadValue - t.assignedLoad
+            };
+          }
+          return t;
+        });
+        
+        setTeachers(updatedTeachers);
+        setEditingTeacher(null);
+        setNewLoadLimit('');
+      } else {
+        alert('Failed to update teacher load: ' + response.data.message);
+      }
+    } catch (err) {
+      console.error('Error updating teacher load:', err);
+      alert('Failed to update teacher load. Please try again.');
+    }
   };
 
   const calculateLoadPercentage = (assigned, limit) => {
@@ -76,45 +136,216 @@ const TeacherSummary = () => {
   };
 
   const exportToExcel = () => {
-    const exportData = teachers.map(teacher => {
-      const baseData = {
-        'Teacher Name': teacher.name,
-        'Position': teacher.position,
-        'Status': teacher.status,
-        'Assigned Load': teacher.assignedLoad,
-        'Load Limit': teacher.loadLimit,
-        'Remaining Load': teacher.loadLimit - teacher.assignedLoad,
-        'Load Percentage': `${calculateLoadPercentage(teacher.assignedLoad, teacher.loadLimit)}%`
-      };
-      
-      // Create the assignments JSON data
-      let assignmentsJson = [];
-      
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // Current date and user info for metadata
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const currentUser = "Mehmood-Deshmukhi"; // This could be dynamic from your auth system
+    
+    // 1. TEACHERS SUMMARY SHEET
+    const summaryData = teachers.map(teacher => ({
+      'Teacher Name': teacher.name,
+      'Position': teacher.position,
+      'Status': teacher.status,
+      'Assigned Load': teacher.assignedLoad,
+      'Load Limit': teacher.loadLimit,
+      'Remaining Load': teacher.loadLimit - teacher.assignedLoad,
+      'Load Percentage': `${calculateLoadPercentage(teacher.assignedLoad, teacher.loadLimit)}%`,
+      'Number of Courses': teacher.assignmentsDetails?.length || 0
+    }));
+    
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    
+    // Set column widths for summary sheet
+    const summaryColumnWidths = [
+      { wch: 25 }, // Teacher Name
+      { wch: 15 }, // Position
+      { wch: 10 }, // Status
+      { wch: 15 }, // Assigned Load
+      { wch: 15 }, // Load Limit
+      { wch: 15 }, // Remaining Load
+      { wch: 15 }, // Load Percentage
+      { wch: 18 }, // Number of Courses
+    ];
+    summarySheet['!cols'] = summaryColumnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Teachers Summary');
+    
+    // 2. DETAILED ASSIGNMENTS SHEET
+    const detailedData = [];
+    teachers.forEach(teacher => {
       if (teacher.assignmentsDetails && teacher.assignmentsDetails.length > 0) {
-        assignmentsJson = teacher.assignmentsDetails.map(assignment => ({
-          courseName: assignment.courseId.subject,
-          courseCode: assignment.courseId.code,
-          divisions: assignment.divisions,
-          batches: assignment.batches,
-          lectureLoad: assignment.lectureLoad,
-          labLoad: assignment.labLoad,
-          totalLoad: assignment.lectureLoad + assignment.labLoad
-        }));
+        teacher.assignmentsDetails.forEach(assignment => {
+          detailedData.push({
+            'Teacher Name': teacher.name,
+            'Teacher Position': teacher.position,
+            'Teacher Status': teacher.status,
+            'Course Name': assignment.courseId.subject,
+            'Course Code': assignment.courseId.code,
+            'Divisions': assignment.divisions,
+            'Batches': assignment.batches,
+            'Lecture Load': assignment.lectureLoad,
+            'Lab Load': assignment.labLoad,
+            'Total Load': assignment.lectureLoad + assignment.labLoad
+          });
+        });
+      } else {
+        detailedData.push({
+          'Teacher Name': teacher.name,
+          'Teacher Position': teacher.position,
+          'Teacher Status': teacher.status,
+          'Course Name': 'No assignments',
+          'Course Code': '-',
+          'Divisions': '-',
+          'Batches': '-',
+          'Lecture Load': 0,
+          'Lab Load': 0,
+          'Total Load': 0
+        });
       }
-      
-      // Add the assignments as a single JSON column
-      return {
-        ...baseData,
-        'Assignments': JSON.stringify(assignmentsJson)
-      };
     });
     
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Teacher Assignments');
+    const detailedSheet = XLSX.utils.json_to_sheet(detailedData);
     
+    // Set column widths for detailed sheet
+    const detailedColumnWidths = [
+      { wch: 25 }, // Teacher Name
+      { wch: 15 }, // Teacher Position
+      { wch: 12 }, // Teacher Status
+      { wch: 30 }, // Course Name
+      { wch: 12 }, // Course Code
+      { wch: 10 }, // Divisions
+      { wch: 10 }, // Batches
+      { wch: 15 }, // Lecture Load
+      { wch: 12 }, // Lab Load
+      { wch: 12 }, // Total Load
+    ];
+    detailedSheet['!cols'] = detailedColumnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Assignments');
+    
+    // 3. COURSES OVERVIEW SHEET - New sheet focusing on courses
+    const coursesData = [];
+    const courseMap = new Map();
+    
+    // Group assignments by course
+    teachers.forEach(teacher => {
+      if (teacher.assignmentsDetails && teacher.assignmentsDetails.length > 0) {
+        teacher.assignmentsDetails.forEach(assignment => {
+          const courseId = assignment.courseId._id;
+          if (!courseMap.has(courseId)) {
+            courseMap.set(courseId, {
+              'Course Name': assignment.courseId.subject,
+              'Course Code': assignment.courseId.code,
+              'Total Teachers': 0,
+              'Total Divisions': 0,
+              'Total Batches': 0,
+              'Teachers List': [],
+            });
+          }
+          
+          const courseData = courseMap.get(courseId);
+          courseData['Total Teachers'] += 1;
+          courseData['Total Divisions'] += parseInt(assignment.divisions) || 0;
+          courseData['Total Batches'] += parseInt(assignment.batches) || 0;
+          
+          // Add teacher to the list if not already included
+          if (!courseData['Teachers List'].includes(teacher.name)) {
+            courseData['Teachers List'].push(teacher.name);
+          }
+        });
+      }
+    });
+    
+    // Convert map to array for the sheet
+    courseMap.forEach((value) => {
+      coursesData.push({
+        'Course Name': value['Course Name'],
+        'Course Code': value['Course Code'],
+        'Total Teachers': value['Total Teachers'],
+        'Total Divisions': value['Total Divisions'],
+        'Total Batches': value['Total Batches'],
+        'Teachers Assigned': value['Teachers List'].join(', ')
+      });
+    });
+    
+    // Sort courses by name
+    coursesData.sort((a, b) => a['Course Name'].localeCompare(b['Course Name']));
+    
+    const coursesSheet = XLSX.utils.json_to_sheet(coursesData);
+    
+    // Set column widths for courses sheet
+    const coursesColumnWidths = [
+      { wch: 30 }, // Course Name
+      { wch: 15 }, // Course Code
+      { wch: 15 }, // Total Teachers
+      { wch: 15 }, // Total Divisions
+      { wch: 15 }, // Total Batches
+      { wch: 50 }, // Teachers Assigned
+    ];
+    coursesSheet['!cols'] = coursesColumnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, coursesSheet, 'Courses Overview');
+    
+    // 4. DIVISIONS AND BATCHES SUMMARY - New sheet specifically for divisions and batches
+    const divisionsData = [];
+    
+    // Create a simplified view focused on divisions and batches
+    teachers.forEach(teacher => {
+      if (teacher.assignmentsDetails && teacher.assignmentsDetails.length > 0) {
+        teacher.assignmentsDetails.forEach(assignment => {
+          divisionsData.push({
+            'Teacher': teacher.name,
+            'Course': assignment.courseId.subject,
+            'Course Code': assignment.courseId.code,
+            'Divisions Assigned': assignment.divisions,
+            'Batches Assigned': assignment.batches,
+            'Division Details': `${assignment.divisions} division(s)`,
+            'Batch Details': `${assignment.batches} batch(es)`,
+            'Total Teaching Load': assignment.lectureLoad + assignment.labLoad
+          });
+        });
+      }
+    });
+    
+    // Sort by teacher name
+    divisionsData.sort((a, b) => a['Teacher'].localeCompare(b['Teacher']));
+    
+    const divisionsSheet = XLSX.utils.json_to_sheet(divisionsData);
+    
+    // Set column widths for divisions sheet
+    const divisionsColumnWidths = [
+      { wch: 25 }, // Teacher
+      { wch: 30 }, // Course
+      { wch: 12 }, // Course Code
+      { wch: 18 }, // Divisions Assigned
+      { wch: 18 }, // Batches Assigned
+      { wch: 20 }, // Division Details
+      { wch: 20 }, // Batch Details
+      { wch: 18 }, // Total Teaching Load
+    ];
+    divisionsSheet['!cols'] = divisionsColumnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, divisionsSheet, 'Divisions & Batches');
+    
+    // Add metadata
+    workbook.Props = {
+      Title: "Faculty Assignments Report",
+      Subject: "Teacher Course Assignments with Divisions and Batches",
+      Author: currentUser,
+      CreatedDate: new Date(),
+      Manager: "Faculty Management System",
+      Company: "Educational Institution",
+      LastModifiedBy: currentUser,
+    };
+    
+    // Get current date and time in a readable format for the filename
     const date = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(workbook, `Teacher_Assignments_${date}.xlsx`);
+    const time = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
+    
+    // Export the file
+    XLSX.writeFile(workbook, `Teachers_and_Courses_Report_${date}_${time}.xlsx`);
   };
 
   if (loading) {
@@ -137,11 +368,20 @@ const TeacherSummary = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 py-8 max-w-7xl mt-8">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center">
-          <Users className="h-8 w-8 text-blue-600 mr-3" />
-          <h1 className="text-3xl font-bold text-gray-800">Teacher Summary</h1>
+          <button 
+            onClick={() => navigate('/')} 
+            className="mr-4 p-2 rounded-full hover:bg-gray-100 transition-colors duration-200"
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-6 w-6 text-blue-600" />
+          </button>
+          <div className="flex items-center">
+            <Users className="h-8 w-8 text-blue-600 mr-3" />
+            <h1 className="text-3xl font-bold text-gray-800">Teacher Summary</h1>
+          </div>
         </div>
         <div className="flex space-x-4">
           <div className="bg-blue-50 px-4 py-2 rounded-lg">
@@ -266,6 +506,13 @@ const TeacherSummary = () => {
                           <span className="text-sm font-medium text-gray-700">
                             {teacher.assignedLoad} / {teacher.loadLimit}
                           </span>
+                          <button 
+                            onClick={(e) => startEditingTeacherLoad(teacher, e)} 
+                            className="ml-1 text-blue-500 hover:text-blue-700"
+                            aria-label="Edit teacher load"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                         <div className="w-24 bg-gray-200 rounded-full h-2 mt-1">
                           <div 
@@ -290,9 +537,18 @@ const TeacherSummary = () => {
                       }`}>
                         {teacher.status}
                       </span>
-                      <span className="text-sm font-medium text-gray-700">
-                        {teacher.assignedLoad} / {teacher.loadLimit}
-                      </span>
+                      <div className="flex items-center">
+                        <span className="text-sm font-medium text-gray-700">
+                          {teacher.assignedLoad} / {teacher.loadLimit}
+                        </span>
+                        <button 
+                          onClick={(e) => startEditingTeacherLoad(teacher, e)} 
+                          className="ml-1 text-blue-500 hover:text-blue-700"
+                          aria-label="Edit teacher load"
+                        >
+                          <Edit className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
@@ -314,7 +570,46 @@ const TeacherSummary = () => {
                         </div>
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                           <p className="text-sm text-gray-500">Load Limit</p>
-                          <p className="text-xl font-bold">{teacher.loadLimit}</p>
+                          <div className="flex items-center">
+                            {editingTeacher === teacher._id ? (
+                              <div className="flex items-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.5"
+                                  value={newLoadLimit}
+                                  onChange={(e) => setNewLoadLimit(e.target.value)}
+                                  className="text-xl font-bold w-20 border-b-2 border-blue-500 focus:outline-none bg-transparent"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <div className="ml-2 flex">
+                                  <button 
+                                    onClick={(e) => saveTeacherLoad(teacher, e)}
+                                    className="p-1 text-green-600 hover:text-green-800"
+                                  >
+                                    <CircleCheck className="h-5 w-5" />
+                                  </button>
+                                  <button 
+                                    onClick={(e) => cancelEditingTeacherLoad(e)}
+                                    className="p-1 text-red-600 hover:text-red-800"
+                                  >
+                                    <AlertCircle className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-xl font-bold">{teacher.loadLimit}</p>
+                                <button 
+                                  onClick={(e) => startEditingTeacherLoad(teacher, e)} 
+                                  className="ml-2 text-blue-500 hover:text-blue-700"
+                                  aria-label="Edit teacher load"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
                           <p className="text-sm text-gray-500">Remaining Load</p>
