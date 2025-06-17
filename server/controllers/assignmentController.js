@@ -209,6 +209,72 @@ const updateAssignment = async (req, res) => {
     }
 };
 
+const deleteMultipleAssignments = async (req, res) => {
+    try {
+        const { assignmentIds } = req.body;
+        if (!assignmentIds || !Array.isArray(assignmentIds) || assignmentIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid assignment IDs. Expected an array of IDs.",
+                data: null
+            });
+        }
+        const results = {
+            successful: [],
+            failed: []
+        };
+
+        for (let i = 0; i < assignmentIds.length; i++) {
+            const id = assignmentIds[i];
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                results.failed.push({
+                    index: i,
+                    error: "Invalid assignment ID",
+                    assignmentId: id
+                });
+                continue;
+            }
+
+            try {
+                const assignment = await Assignment.findById(id);
+                if (!assignment) {
+                    results.failed.push({
+                        index: i,
+                        error: "Assignment not found",
+                        assignmentId: id
+                    });
+                    continue;
+                }
+
+                const result = await Assignment.deleteAssignment(id);
+                results.successful.push({
+                    index: i,
+                    result
+                });
+            } catch (error) {
+                results.failed.push({
+                    index: i,
+                    error: error.message,
+                    assignmentId: id
+                });
+            }
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Assignments deleted successfully!",
+            data: results
+        });
+    } catch (error) {
+        console.log(error.message);
+        return res.status(500).json({
+            success: false,
+            error: error.message,
+            message: "Failed to delete assignments!",
+            data: null
+        });
+    }
+}
+
 const deleteAssignment = async (req, res) => {
     try {
         const { id } = req.params;
@@ -313,5 +379,6 @@ module.exports = {
     assignTeacher,
     updateAssignment,
     deleteAssignment,
-    getAssignmentsByTeacher
+    getAssignmentsByTeacher,
+    deleteMultipleAssignments
 }
