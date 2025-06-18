@@ -44,7 +44,7 @@ const TeacherSelector = ({
 
 	useEffect(() => {
 		const _assignments = assignments.filter((a) => a.courseId === courseId);
-	
+
 		if (index < _assignments.length) {
 			const _assignment = _assignments[index];
 			setAssignment(_assignment);
@@ -61,11 +61,13 @@ const TeacherSelector = ({
 				});
 			}
 		}
+
 		// console.log(remainingDivisions, "remainingDivisions");
 		// console.log(remainingBatches, "remainingBatches");
 
 		// setRequiredLoad(remainingDivisions * course.lectHrs + remainingBatches * course.labHrs);
 	}, []);
+
 
 	useEffect(() => {
 		const _assignment = assignments.find(
@@ -169,7 +171,6 @@ const TeacherSelector = ({
 
 
 	const onChangeDivisions = (value) => {
-		console.log(value, "value");
 
 		// here divisions state is essentially denoting the assigned divisions
 		// so if we change the assigned divisions naturally the remaining divisions will change
@@ -203,16 +204,37 @@ const TeacherSelector = ({
 		// const totalAssignedLoad = assignedLectLoad + assignedLabLoad;
 		// console.log(loadLimit - (totalAssignedLoad + divisions * course.lectHrs + batches * course.labHrs), "remaining load");
 		// return (loadLimit - (totalAssignedLoad + divisions * course.lectHrs + batches * course.labHrs));
-	
+
 		let totalAssignedLoad = selectedTeacher.assignedLoad;
 
-		if(assignment) {
+		if (assignment) {
 			totalAssignedLoad -= (assignment.divisions * course.lectHrs + assignment.batches * course.labHrs);
 		}
 
 		return loadLimit - (totalAssignedLoad + divisions * course.lectHrs + batches * course.labHrs);
 	}
 
+
+	const getMaxDivisions = () => {
+		if (isAssignMode) {
+			return remainingDivisions;
+		} else {
+			// in edit mode, add back the currently assigned divisions to the remaining
+			console.log(assignmentPreview, "assignmentPreview");
+			const currentAssignedDivisions = assignmentPreview?.divisions || 0;
+			return remainingDivisions + currentAssignedDivisions;
+		}
+	};
+
+	const getMaxBatches = () => {
+		if (isAssignMode) {
+			return remainingBatches;
+		} else {
+			// in edit mode, add back the currently assigned batches to the remaining
+			const currentAssignedBatches = assignmentPreview?.batches || 0;
+			return remainingBatches + currentAssignedBatches;
+		}
+	};
 	return (
 		<div className="relative w-full">
 			{assignmentPreview ? (
@@ -343,7 +365,6 @@ const TeacherSelector = ({
 								</div>
 							</div>
 
-							{/* Assignment Details Section */}
 							<div className="grid grid-cols-2 gap-4 mb-6">
 								<div>
 									<label className="block text-sm font-medium text-gray-700 mb-2">
@@ -361,7 +382,7 @@ const TeacherSelector = ({
 										<input
 											type="number"
 											min="0"
-											max={remainingDivisions}
+											max={getMaxDivisions()}
 											value={divisions}
 											onChange={(e) => {
 												// const value = Math.min(
@@ -376,7 +397,7 @@ const TeacherSelector = ({
 										/>
 										<button
 											onClick={() =>
-												onChangeDivisions(Math.min(remainingDivisions, divisions + 1))
+												onChangeDivisions(Math.min(getMaxDivisions(), divisions + 1))
 											}
 											className="px-3 py-1 bg-gray-100 border-r border-y border-gray-300 rounded-r-md text-gray-700 hover:bg-gray-200"
 										>
@@ -384,7 +405,7 @@ const TeacherSelector = ({
 										</button>
 									</div>
 									<div className="text-xs text-gray-500 mt-1">
-										Max: {remainingDivisions}
+										Max: {getMaxDivisions()}
 									</div>
 								</div>
 
@@ -402,7 +423,7 @@ const TeacherSelector = ({
 										<input
 											type="number"
 											min="0"
-											max={remainingBatches}
+											max={getMaxBatches()}
 											value={batches}
 											onChange={(e) => {
 												// const value = Math.min(
@@ -412,14 +433,14 @@ const TeacherSelector = ({
 												// setBatches(value);
 
 												onChangeBatches(Math.min(
-													parseInt(e.target.value) || 0, remainingBatches
+													parseInt(e.target.value) || 0, getMaxBatches()
 												));
 											}}
 											className="block w-full px-3 py-1 text-sm text-center border-y border-gray-300 focus:ring-blue-500 focus:border-blue-500"
 										/>
 										<button
 											onClick={() =>
-												setBatches(Math.min(remainingBatches, batches + 1))
+												setBatches(Math.min(getMaxBatches(), batches + 1))
 											}
 											className="px-3 py-1 bg-gray-100 border-r border-y border-gray-300 rounded-r-md text-gray-700 hover:bg-gray-200"
 										>
@@ -427,7 +448,7 @@ const TeacherSelector = ({
 										</button>
 									</div>
 									<div className="text-xs text-gray-500 mt-1">
-										Max: {remainingBatches}
+										Max: {getMaxBatches()}
 									</div>
 								</div>
 							</div>
