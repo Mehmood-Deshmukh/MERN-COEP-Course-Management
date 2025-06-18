@@ -32,6 +32,7 @@ const TeacherAssignment = () => {
   const [totalCourses, setTotalCourses] = useState(0);
   const [isSaveDisabled, setIsSaveDisabled] = useState(true);
   const [deletedAssignments, setDeletedAssignments] = useState([]);
+  const [deletionCounter, setDeletionCounter] = useState(0);
 
   const navigate = useNavigate();
 
@@ -218,6 +219,10 @@ const TeacherAssignment = () => {
     fetchCourses();
   }, []);
 
+  useEffect(() => {
+    console.log(deletedAssignments);
+  }, [deletedAssignments]);
+
   // ==================================================================================================
   // ================================= VERY IMPORTANT FUNCTION ========================================
   // ==================================================================================================
@@ -234,7 +239,6 @@ const TeacherAssignment = () => {
 
       // if an assignment already exists, update it
       if (existingAssignment) {
-        console.log("Updating existing assignment:", existingAssignment);
 
         // update the assignments state with the new assignment
         // with updated divisions and batches
@@ -461,6 +465,8 @@ const TeacherAssignment = () => {
       setAllCourses(updatedAllCourses);
       setCourses(updatedCourses);
       setFilteredCourses(updatedCourses);
+      setDeletionCounter(prev => prev + 1);
+
 
       // add the deleted assignment to the deletedAssignments state
       // backend only needs to be updated if the assignment has an _id
@@ -471,6 +477,7 @@ const TeacherAssignment = () => {
           assignmentToDelete,
         ]);
       }
+      console.log("Deleted assignment:", assignmentToDelete);
 
       setMessage({
         type: "success",
@@ -554,24 +561,33 @@ const TeacherAssignment = () => {
 
   // ======================================================SUBMIT FUNCTION============================================
   const handleSubmitAssignments = async () => {
+    let hasDeletedAssignments = false;
     setLoading(true);
     if(deletedAssignments.length > 0) {
+      console.log("Submitting deleted assignments:", deletedAssignments);
       setMessage({
         type: "info",
         text: "Submitting deleted assignments...",
       });
       await submitDeletedAssignments();
+      hasDeletedAssignments = true;
     }
 
     try {
       const finalAssignments = assignments.filter((a) => a.original !== true);
 
       if (finalAssignments.length === 0) {
-        setMessage({
-          type: "warning",
-          text: "No new assignments to submit",
-        });
-        setLoading(false);
+        if(hasDeletedAssignments) {
+          setMessage({
+            type: "info",
+            text: "Assignments were deleted successfully! No new assignments to submit.",
+          });
+        }else {
+          setMessage({
+            type: "warning",
+            text: "No new assignments to submit",
+          });
+        }
         return;
       }
 
@@ -983,7 +999,7 @@ const TeacherAssignment = () => {
                       </td>
 
                       {Array.from({ length: 6 }).map((_, index) => (
-                        <td key={index} className="px-2 py-3">
+                        <td key={`${course._id}-${index}-${deletionCounter}`}  className="px-2 py-3">
                           <TeacherSelector
                             teachers={teachers}
                             courseId={course._id}

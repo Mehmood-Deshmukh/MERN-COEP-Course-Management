@@ -44,7 +44,6 @@ const TeacherSelector = ({
 
 	useEffect(() => {
 		const _assignments = assignments.filter((a) => a.courseId === courseId);
-
 		if (index < _assignments.length) {
 			const _assignment = _assignments[index];
 			setAssignment(_assignment);
@@ -140,15 +139,12 @@ const TeacherSelector = ({
 				divisions,
 				batches,
 			});
-			console.log("onAssign called with:", courseId, selectedTeacher._id, divisions, batches);
 			onAssign(courseId, selectedTeacher._id, divisions, batches);
 			setShowModal(false);
 		}
 	};
 
 	useEffect(() => {
-		console.log("Remaining Divisions State:", remainingDivisionsState);
-		console.log("Remaining Batches State:", remainingBatchesState);
 		setRequiredLoad(remainingDivisionsState * course.lectHrs + remainingBatchesState * course.labHrs);
 	}, [divisions, batches, remainingDivisionsState, remainingBatchesState]);
 
@@ -220,7 +216,6 @@ const TeacherSelector = ({
 			return remainingDivisions;
 		} else {
 			// in edit mode, add back the currently assigned divisions to the remaining
-			console.log(assignmentPreview, "assignmentPreview");
 			const currentAssignedDivisions = assignmentPreview?.divisions || 0;
 			return remainingDivisions + currentAssignedDivisions;
 		}
