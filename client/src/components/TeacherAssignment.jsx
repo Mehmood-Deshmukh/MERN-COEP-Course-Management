@@ -321,7 +321,6 @@ const TeacherAssignment = () => {
         setFilteredCourses(updatedCourses);
 
         setIsSaveDisabled(false);
-        console.log("Assignment updated successfully");
       }
 
       // if no assignment exists, create a new one
@@ -887,19 +886,19 @@ const TeacherAssignment = () => {
                     scope="col"
                     className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
                   >
-                    Lect.
+                    Lect. Load (hrs)
                   </th>
                   <th
                     scope="col"
                     className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
                   >
-                    Lab
+                    Lab Load (hrs)
                   </th>
                   <th
                     scope="col"
                     className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-1/18"
                   >
-                    Total
+                    Total Load (hrs)
                   </th>
                   <th
                     scope="col"
