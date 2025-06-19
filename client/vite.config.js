@@ -2,15 +2,21 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwind from '@tailwindcss/vite'
 
-// https://vite.dev/config/
+const backendHost = process.env.BACKEND_HOST || 'http://server:5000'
+
 export default defineConfig({
-	server: {
-		proxy: {
-			'/api': {
-				target: 'http://localhost:5000',
-				changeOrigin: true,
-			},
-		},
-	},
-	plugins: [tailwind(), react()],
+  server: {
+    host: '0.0.0.0',   
+    port: 5173,
+    watch: {
+      usePolling: true 
+    },
+    proxy: {
+      '/api': {
+        target: backendHost,
+        changeOrigin: true,
+      },
+    },
+  },
+  plugins: [tailwind(), react()],
 })

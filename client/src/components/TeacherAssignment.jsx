@@ -477,7 +477,6 @@ const TeacherAssignment = () => {
           assignmentToDelete,
         ]);
       }
-      console.log("Deleted assignment:", assignmentToDelete);
 
       setMessage({
         type: "success",
@@ -687,7 +686,6 @@ const TeacherAssignment = () => {
     <div className="bg-gray-50 w-full min-h-screen">
       <div className="mx-auto px-4 py-6">
         <div className="bg-white rounded-xl shadow-md p-6">
-          {/* Header and Actions */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
             <h1 className="text-2xl font-bold text-gray-800">
               Teacher Assignment System
