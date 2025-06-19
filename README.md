@@ -36,21 +36,6 @@ To run the app, make sure you have docker installed.
     sudo docker run hello-world
     ```
 
-### `.env` setup
-1. Frontend `client/.env`:
-    ```
-    VITE_APP_API_URL=http://server:5000
-    ```
-    docker uses `server` host and NOT `localhost` so this env variable is essential if you are running setup with docker container.
-
-2. Backend `server/.env`:
-    ```
-    MONGO_URI=mongodb://localhost:27017/course-management
-    MONGO_DOCKER_URI=mongodb://mongo:27017/course-management
-    PORT=5000
-    ```
-    again docker uses `mongo` host instead of `localhost` so these variables are also essential.
-
 ### How to start the application:
 1. Clone the repo
     ```

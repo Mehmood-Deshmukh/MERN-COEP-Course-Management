@@ -20,7 +20,7 @@ services:
     environment:
       - NODE_ENV=development
       - HOST=0.0.0.0
-      - MONGO_DOCKER_URI=mongodb://mongo:27017/course-management
+      - MONGO_URI=mongodb://mongo:27017/course-management
     depends_on:
       - mongo
 

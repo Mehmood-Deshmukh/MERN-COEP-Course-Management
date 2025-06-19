@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwind from '@tailwindcss/vite'
 
-const backendHost = process.env.BACKEND_HOST || 'http://server:5000'
+const backendHost = process.env.BACKEND_HOST || 'http://localhost:5000'
 
 export default defineConfig({
   server: {
