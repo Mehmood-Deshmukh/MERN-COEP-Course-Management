@@ -175,8 +175,50 @@ const getCourses = async (req, res) => {
     }
 };
 
+const addCourse = async (req, res) => {
+    try {
+        const { subject, curriculum, sem, lectHrs, labHrs, tutHrs, divisions, batches } = req.body;
+        if (!subject || !curriculum || !sem || !lectHrs || !labHrs) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide all required fields'
+            });
+        }   
+        const year = determineYear(sem);
+        const reqLectLoad = divisions * lectHrs;
+        const reqLabLoad = batches * labHrs;
+        const newCourse = new Course({
+            subject,
+            curriculum,
+            sem,
+            year,
+            lectHrs: parseFloat(lectHrs),
+            labHrs: parseFloat(labHrs),
+            tutHrs: parseFloat(tutHrs) || 0,
+            divisions,
+            batches,
+            reqLectLoad,
+            reqLabLoad,
+            reqTotalLoad: reqLectLoad + reqLabLoad
+        });
+
+        const savedCourse = await newCourse.save();
+        return res.status(201).json({
+            success: true,
+            message: 'Course added successfully',   
+            data: savedCourse
+        });
+    } catch (error) {
+        console.error('Error adding course:', error);
+        return res.status(500).json({
+            success: false,
+            message: `Error adding course: ${error.message}`
+        });
+    }
+};
 
 module.exports = {
     importCourses,
-    getCourses
+    getCourses,
+    addCourse
 };

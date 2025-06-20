@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import TeacherSelector from "./TeacherSelector";
 import { useNavigate } from "react-router-dom";
+import AddCourseModal from "./AddCourseModal";
 
 const TeacherAssignment = () => {
   const [teachers, setTeachers] = useState([]);
@@ -34,8 +35,18 @@ const TeacherAssignment = () => {
   const [deletedAssignments, setDeletedAssignments] = useState([]);
   const [deletionCounter, setDeletionCounter] = useState(0);
 
-  const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const handleSuccess = (successMessage) => {
+    setMessage({successMessage });
+    fetchCourses();
+  };
+  
+  const handleError = (errorMessage) => {
+    setMessage({ errorMessage });
+  };
+  
 
+  const navigate = useNavigate();
 
   const [yearOptions] = useState([
     "1st Year",
@@ -239,7 +250,6 @@ const TeacherAssignment = () => {
 
       // if an assignment already exists, update it
       if (existingAssignment) {
-
         // update the assignments state with the new assignment
         // with updated divisions and batches
         const updatedAssignments = assignments.map((assignment) => {
@@ -395,7 +405,6 @@ const TeacherAssignment = () => {
   };
 
   const handleDeleteAssignment = (courseId, teacherId) => {
-
     setLoading(true);
     try {
       // find the assignment to delete
@@ -416,7 +425,10 @@ const TeacherAssignment = () => {
       // update the assignments state by filtering out the deleted assignment
       const updatedAssignments = assignments.filter(
         (assignment) =>
-          !(assignment.courseId === courseId && assignment.teacherId === teacherId)
+          !(
+            assignment.courseId === courseId &&
+            assignment.teacherId === teacherId
+          )
       );
       setAssignments(updatedAssignments);
 
@@ -440,7 +452,8 @@ const TeacherAssignment = () => {
           return {
             ...course,
             reqLectLoad:
-              course.reqLectLoad + assignmentToDelete.divisions * course.lectHrs,
+              course.reqLectLoad +
+              assignmentToDelete.divisions * course.lectHrs,
             reqLabLoad:
               course.reqLabLoad + assignmentToDelete.batches * course.labHrs,
           };
@@ -453,7 +466,8 @@ const TeacherAssignment = () => {
           return {
             ...course,
             reqLectLoad:
-              course.reqLectLoad + assignmentToDelete.divisions * course.lectHrs,
+              course.reqLectLoad +
+              assignmentToDelete.divisions * course.lectHrs,
             reqLabLoad:
               course.reqLabLoad + assignmentToDelete.batches * course.labHrs,
           };
@@ -465,17 +479,13 @@ const TeacherAssignment = () => {
       setAllCourses(updatedAllCourses);
       setCourses(updatedCourses);
       setFilteredCourses(updatedCourses);
-      setDeletionCounter(prev => prev + 1);
-
+      setDeletionCounter((prev) => prev + 1);
 
       // add the deleted assignment to the deletedAssignments state
       // backend only needs to be updated if the assignment has an _id
       // (or it was already saved to the database)
-      if(assignmentToDelete._id) {
-        setDeletedAssignments((prev) => [
-          ...prev,
-          assignmentToDelete,
-        ]);
+      if (assignmentToDelete._id) {
+        setDeletedAssignments((prev) => [...prev, assignmentToDelete]);
       }
 
       setMessage({
@@ -485,21 +495,21 @@ const TeacherAssignment = () => {
     } catch (e) {
       console.error("Error deleting assignment:", e);
       setMessage({ type: "error", text: "Failed to delete assignment" });
-    }finally{
+    } finally {
       setLoading(false);
       setIsSaveDisabled(false); // enable save button after deletion
     }
-  }
+  };
 
   // ==================================================================================================
 
-  // ALL THESE FUNCTIONS PULL DATA FROM THE COURSES STATE VARIABLE THEY DO NOT CALCULATE DATA ON THE FLY 
-  // I SUPPOSE THAT IS RESPONSIBILITY OF THE TEACHER SELECTOR COMPONENT 
+  // ALL THESE FUNCTIONS PULL DATA FROM THE COURSES STATE VARIABLE THEY DO NOT CALCULATE DATA ON THE FLY
+  // I SUPPOSE THAT IS RESPONSIBILITY OF THE TEACHER SELECTOR COMPONENT
 
   // this getRemainingDivisions function calculates the remaining divisions for a course
-  // it pulls the data from the state variable and it is not dynamic when we use it to 
-  // control input to load 
-  // it can be used as the inital value for the input field but we have to keep extra state 
+  // it pulls the data from the state variable and it is not dynamic when we use it to
+  // control input to load
+  // it can be used as the inital value for the input field but we have to keep extra state
   // in teacher selector component to control the input value
   const getRemainingDivisions = (courseId) => {
     const course = allCourses.find((c) => c._id === courseId);
@@ -517,7 +527,7 @@ const TeacherAssignment = () => {
   };
 
   // this getRemainingBatches has the same story as getRemainingDivisions
-  // so again only initial state selector component needs to have its own 
+  // so again only initial state selector component needs to have its own
   // logic to set clamped value for the input field
   const getRemainingBatches = (courseId) => {
     const course = allCourses.find((c) => c._id === courseId);
@@ -562,7 +572,7 @@ const TeacherAssignment = () => {
   const handleSubmitAssignments = async () => {
     let hasDeletedAssignments = false;
     setLoading(true);
-    if(deletedAssignments.length > 0) {
+    if (deletedAssignments.length > 0) {
       console.log("Submitting deleted assignments:", deletedAssignments);
       setMessage({
         type: "info",
@@ -576,12 +586,12 @@ const TeacherAssignment = () => {
       const finalAssignments = assignments.filter((a) => a.original !== true);
 
       if (finalAssignments.length === 0) {
-        if(hasDeletedAssignments) {
+        if (hasDeletedAssignments) {
           setMessage({
             type: "info",
             text: "Assignments were deleted successfully! No new assignments to submit.",
           });
-        }else {
+        } else {
           setMessage({
             type: "warning",
             text: "No new assignments to submit",
@@ -691,6 +701,21 @@ const TeacherAssignment = () => {
               Teacher Assignment System
             </h1>
             <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+              <>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                >
+                  Add New Course
+                </button>
+
+                <AddCourseModal
+                  isOpen={isModalOpen}
+                  onClose={() => setIsModalOpen(false)}
+                  onSuccess={handleSuccess}
+                  onError={handleError}
+                />
+              </>
               <button
                 onClick={() => {
                   fetchTeachers();
@@ -715,7 +740,9 @@ const TeacherAssignment = () => {
               <button
                 onClick={handleSubmitAssignments}
                 disabled={
-                  (isSaveDisabled) && (assignments.filter((a) => !a.original).length === 0 || loading)
+                  isSaveDisabled &&
+                  (assignments.filter((a) => !a.original).length === 0 ||
+                    loading)
                 }
                 className="px-4 py-2 bg-blue-600 text-white rounded-md flex items-center justify-center shadow-sm hover:bg-blue-700 transition-colors disabled:bg-blue-300"
               >
@@ -728,12 +755,13 @@ const TeacherAssignment = () => {
           {/* Message Alert */}
           {message && (
             <div
-              className={`p-4 mb-6 rounded-lg border ${message.type === "success"
-                ? "bg-green-50 border-green-200 text-green-800"
-                : message.type === "warning"
+              className={`p-4 mb-6 rounded-lg border ${
+                message.type === "success"
+                  ? "bg-green-50 border-green-200 text-green-800"
+                  : message.type === "warning"
                   ? "bg-yellow-50 border-yellow-200 text-yellow-800"
                   : "bg-red-50 border-red-200 text-red-800"
-                } flex items-center`}
+              } flex items-center`}
             >
               {message.type === "success" ? (
                 <Check size={18} className="mr-2 flex-shrink-0" />
@@ -934,8 +962,9 @@ const TeacherAssignment = () => {
                   return (
                     <tr
                       key={course._id}
-                      className={`hover:bg-gray-50 transition-colors ${isFullyAssigned ? "bg-green-50" : ""
-                        }`}
+                      className={`hover:bg-gray-50 transition-colors ${
+                        isFullyAssigned ? "bg-green-50" : ""
+                      }`}
                     >
                       <td className="px-3 py-3 text-sm text-gray-900 align-top">
                         <div className="max-w-xs break-words font-medium">
@@ -966,30 +995,33 @@ const TeacherAssignment = () => {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
                         <div
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${course.reqLectLoad === 0
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
-                            }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            course.reqLectLoad === 0
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
                         >
                           {course.reqLectLoad}/{course.totalLectLoad}
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
                         <div
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${course.reqLabLoad === 0
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
-                            }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            course.reqLabLoad === 0
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
                         >
                           {course.reqLabLoad}/{course.totalLabLoad}
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap text-sm text-center">
                         <div
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${course.reqLectLoad + course.reqLabLoad === 0
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
-                            }`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            course.reqLectLoad + course.reqLabLoad === 0
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
                         >
                           {course.reqLectLoad + course.reqLabLoad}/
                           {course.totalLoad}
@@ -997,7 +1029,10 @@ const TeacherAssignment = () => {
                       </td>
 
                       {Array.from({ length: 6 }).map((_, index) => (
-                        <td key={`${course._id}-${index}-${deletionCounter}`}  className="px-2 py-3">
+                        <td
+                          key={`${course._id}-${index}-${deletionCounter}`}
+                          className="px-2 py-3"
+                        >
                           <TeacherSelector
                             teachers={teachers}
                             courseId={course._id}
