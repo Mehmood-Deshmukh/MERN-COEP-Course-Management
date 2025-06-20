@@ -46,19 +46,19 @@ const transformRowToCourse = (row) => {
     const year = determineYear(sem);
 
 
-    const divisions = calculateDivisions(year);
-    const batches = divisions * 4;
+    const divisions =   parseFloat(row['Divisions']) || calculateDivisions(year);
+    const batches = parseFloat(row['#Batches'] || row['Batches']) ||  divisions * 4;
 
-    const lectHrs = parseFloat(row['Lect Hrs'] || row['Lect\nHrs'] || 0);
-    const labHrs = parseFloat(row['Lab Hrs'] || row['Lab\nHrs'] || 0);
-    const tutHrs = parseFloat(row['Tut Hrs'] || row['Tut\nHrs'] || 0);
+    const lectHrs = parseFloat(row['Lect Hrs'] || row['Lect\nHrs'] || row['Lect\r\nHrs'] || 0);
+    const labHrs = parseFloat(row['Lab Hrs'] || row['Lab\nHrs'] || row['Lab\r\nHrs'] || 0);
+    const tutHrs = parseFloat(row['Tut Hrs'] || row['Tut\nHrs'] || row['Tut\r\nHrs'] || 0);
 
     const reqLectLoad = divisions * lectHrs;
     const reqLabLoad = batches * labHrs;
 
     return {
         subject: row.Subject,
-        curriculum: row.Curriculum || '',
+        curriculum: row.Curriculum || '24-28',
         sem,
         year,
         lectHrs,
