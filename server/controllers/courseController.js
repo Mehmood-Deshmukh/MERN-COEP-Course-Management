@@ -1,224 +1,310 @@
-const Course = require('../models/courseModel');
-const xlsx = require('xlsx');
+const Course = require("../models/courseModel");
+const xlsx = require("xlsx");
 
 const determineYear = (sem) => {
-    if (typeof sem === 'string' && sem.startsWith('MT')) {
-        if (sem.includes('I') && !sem.includes('III') && !sem.includes('IV')) {
-            return 'MTech 1st Year';
-        } else if (sem.includes('III') || sem.includes('IV')) {
-            return 'MTech 2nd Year';
-        }
-        return 'Unknown';
-    }
+	if (typeof sem === "string" && sem.startsWith("MT")) {
+		if (sem.includes("I") && !sem.includes("III") && !sem.includes("IV")) {
+			return "MTech 1st Year";
+		} else if (sem.includes("III") || sem.includes("IV")) {
+			return "MTech 2nd Year";
+		}
+		return "Unknown";
+	}
 
-    const semMapping = {
-        'I': '1st Year',
-        'II': '1st Year',
-        'III': '2nd Year',
-        'IV': '2nd Year',
-        'V': '3rd Year',
-        'VI': '3rd Year',
-        'VII': '4th Year',
-        'VIII': '4th Year'
-    };
+	const semMapping = {
+		I: "1st Year",
+		II: "1st Year",
+		III: "2nd Year",
+		IV: "2nd Year",
+		V: "3rd Year",
+		VI: "3rd Year",
+		VII: "4th Year",
+		VIII: "4th Year",
+	};
 
-    const year = semMapping[sem];
-    if (!year && sem?.startsWith('VIII')) {
-        return '4th Year';
-    }
-    return year || 'Unknown';
+	const year = semMapping[sem];
+	if (!year && sem?.startsWith("VIII")) {
+		return "4th Year";
+	}
+	return year || "Unknown";
 };
 
 const calculateDivisions = (year) => {
-    if (year === '1st Year') return 5;
-    if (['2nd Year', '3rd Year', '4th Year'].includes(year)) return 2;
-    if (['MTech 1st Year', 'MTech 2nd Year'].includes(year)) return 1;
-    return 0;
+	if (year === "1st Year") return 5;
+	if (["2nd Year", "3rd Year", "4th Year"].includes(year)) return 2;
+	if (["MTech 1st Year", "MTech 2nd Year"].includes(year)) return 1;
+	return 0;
 };
 
 const transformRowToCourse = (row) => {
-    console.log(row);
-    if (!row.Subject || row.Subject.trim() === '') {
-        return null;
-    }
+	console.log(row);
+	if (!row.Subject || row.Subject.trim() === "") {
+		return null;
+	}
 
-    const sem = row.Sem;
-    const year = determineYear(sem);
+	const sem = row.Sem;
+	const year = determineYear(sem);
 
+	const divisions = parseFloat(row["Divisions"]) || calculateDivisions(year);
+	const batches =
+		parseFloat(row["#Batches"] || row["Batches"]) || divisions * 4;
 
-    const divisions =   parseFloat(row['Divisions']) || calculateDivisions(year);
-    const batches = parseFloat(row['#Batches'] || row['Batches']) ||  divisions * 4;
+	const lectHrs = parseFloat(
+		row["Lect Hrs"] || row["Lect\nHrs"] || row["Lect\r\nHrs"] || 0
+	);
+	const labHrs = parseFloat(
+		row["Lab Hrs"] || row["Lab\nHrs"] || row["Lab\r\nHrs"] || 0
+	);
+	const tutHrs = parseFloat(
+		row["Tut Hrs"] || row["Tut\nHrs"] || row["Tut\r\nHrs"] || 0
+	);
 
-    const lectHrs = parseFloat(row['Lect Hrs'] || row['Lect\nHrs'] || row['Lect\r\nHrs'] || 0);
-    const labHrs = parseFloat(row['Lab Hrs'] || row['Lab\nHrs'] || row['Lab\r\nHrs'] || 0);
-    const tutHrs = parseFloat(row['Tut Hrs'] || row['Tut\nHrs'] || row['Tut\r\nHrs'] || 0);
+	const reqLectLoad = divisions * lectHrs;
+	const reqLabLoad = batches * labHrs;
 
-    const reqLectLoad = divisions * lectHrs;
-    const reqLabLoad = batches * labHrs;
-
-    return {
-        subject: row.Subject,
-        curriculum: row.Curriculum || '24-28',
-        sem,
-        year,
-        lectHrs,
-        labHrs,
-        tutHrs,
-        divisions,
-        batches,
-        reqLectLoad,
-        reqLabLoad,
-        reqTotalLoad: reqLectLoad + reqLabLoad
-    };
+	return {
+		subject: row.Subject,
+		curriculum: row.Curriculum || "24-28",
+		sem,
+		year,
+		lectHrs,
+		labHrs,
+		tutHrs,
+		divisions,
+		batches,
+		reqLectLoad,
+		reqLabLoad,
+		reqTotalLoad: reqLectLoad + reqLabLoad,
+	};
 };
 
-
 const processExcelFile = (buffer) => {
-    const workbook = xlsx.read(buffer, { type: 'buffer' });
-    console.log(workbook.SheetNames);
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = xlsx.utils.sheet_to_json(worksheet);
+	const workbook = xlsx.read(buffer, { type: "buffer" });
+	console.log(workbook.SheetNames);
+	const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+	const jsonData = xlsx.utils.sheet_to_json(worksheet);
 
-    return jsonData
-        .map(row => transformRowToCourse(row))
-        .filter(course => course !== null);
+	return jsonData
+		.map((row) => transformRowToCourse(row))
+		.filter((course) => course !== null);
 };
 
 const importCourses = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please upload a file'
-            });
-        }
+	try {
+		if (!req.file) {
+			return res.status(400).json({
+				success: false,
+				message: "Please upload a file",
+			});
+		}
 
-        const coursesData = processExcelFile(req.file.buffer);
+		const coursesData = processExcelFile(req.file.buffer);
 
-        await Course.deleteMany({});
+		await Course.deleteMany({});
 
-        // sending 200-300 courses directly to the frontend isn't a good thing i think
-        // i am commenting this and i have written seperate route for getCourses with 
-        // pagination hope this works
-        // const insertedCourses = await Course.insertMany(coursesData);
+		// sending 200-300 courses directly to the frontend isn't a good thing i think
+		// i am commenting this and i have written seperate route for getCourses with
+		// pagination hope this works
+		// const insertedCourses = await Course.insertMany(coursesData);
 
-        await Course.insertMany(coursesData);
-        console.log(`Imported ${coursesData.length} courses successfully.`);
+		await Course.insertMany(coursesData);
+		console.log(`Imported ${coursesData.length} courses successfully.`);
 
-        return res.status(200).json({
-            success: true,
-            message: 'Courses imported successfully',
-            data: null // we may send top 10 files here as well but i prefer getCourses at least for now
-        });
-    }
-    catch (error) {
-        console.error('Error importing courses:', error);
-        return res.status(500).json({
-            success: false,
-            message: `Error importing courses: ${error.message}`
-        });
-    }
+		return res.status(200).json({
+			success: true,
+			message: "Courses imported successfully",
+			data: null, // we may send top 10 files here as well but i prefer getCourses at least for now
+		});
+	} catch (error) {
+		console.error("Error importing courses:", error);
+		return res.status(500).json({
+			success: false,
+			message: `Error importing courses: ${error.message}`,
+		});
+	}
 };
 
 const getCourses = async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
+	try {
+		const page = parseInt(req.query.page) || 1;
+		const limit = parseInt(req.query.limit) || 10;
+		const skip = (page - 1) * limit;
 
-        const courses = await Course.find()
-            .sort({ subject: 1 })
-            .skip(skip)
-            .limit(limit)
-            .populate({
-                path: 'assignments',
-                select: '_id teacherId divisions batches lectureLoad labLoad',
-                populate: {
-                    path: 'teacherId',
-                    select: 'name position loadLimit assignedLoad status'
-                }
-            })
-            .lean();
-        for(const course of courses) {
-            if (course.assignments && course.assignments.length > 0) {
-                console.log(course.assignments);
-            }
-        }
+		const courses = await Course.find()
+			.sort({ subject: 1 })
+			.skip(skip)
+			.limit(limit)
+			.populate({
+				path: "assignments",
+				select: "_id teacherId divisions batches lectureLoad labLoad",
+				populate: {
+					path: "teacherId",
+					select: "name position loadLimit assignedLoad status",
+				},
+			})
+			.lean();
+		for (const course of courses) {
+			if (course.assignments && course.assignments.length > 0) {
+				console.log(course.assignments);
+			}
+		}
 
-        const totalCourses = await Course.countDocuments();
-        const totalPages = Math.ceil(totalCourses / limit);
+		const totalCourses = await Course.countDocuments();
+		const totalPages = Math.ceil(totalCourses / limit);
 
-        if (!courses.length) {
-            return res.status(404).json({
-                success: false,
-                message: "Courses not found!",
-                data: null
-            });
-        }
+		if (!courses.length) {
+			return res.status(404).json({
+				success: false,
+				message: "Courses not found!",
+				data: null,
+			});
+		}
 
-        return res.status(200).json({
-            success: true,
-            message: "Courses fetched successfully",
-            page: page,
-            totalPages,
-            data: courses
-        });
-
-    } catch (e) {
-        console.log(e.message);
-        return res.status(500).json({
-            success: false,
-            message: 'Error fetching courses! Please try again!',
-            error: e.message,
-            data: null
-        });
-    }
+		return res.status(200).json({
+			success: true,
+			message: "Courses fetched successfully",
+			page: page,
+			totalPages,
+			data: courses,
+		});
+	} catch (e) {
+		console.log(e.message);
+		return res.status(500).json({
+			success: false,
+			message: "Error fetching courses! Please try again!",
+			error: e.message,
+			data: null,
+		});
+	}
 };
 
 const addCourse = async (req, res) => {
-    try {
-        const { subject, curriculum, sem, lectHrs, labHrs, tutHrs, divisions, batches } = req.body;
-        if (!subject || !curriculum || !sem || !lectHrs || !labHrs) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please provide all required fields'
-            });
-        }   
-        const year = determineYear(sem);
-        const reqLectLoad = divisions * lectHrs;
-        const reqLabLoad = batches * labHrs;
-        const newCourse = new Course({
-            subject,
-            curriculum,
-            sem,
-            year,
-            lectHrs: parseFloat(lectHrs),
-            labHrs: parseFloat(labHrs),
-            tutHrs: parseFloat(tutHrs) || 0,
-            divisions,
-            batches,
-            reqLectLoad,
-            reqLabLoad,
-            reqTotalLoad: reqLectLoad + reqLabLoad
-        });
+	try {
+		const {
+			subject,
+			curriculum,
+			sem,
+			lectHrs,
+			labHrs,
+			tutHrs,
+			divisions,
+			batches,
+		} = req.body;
+		if (!subject || !curriculum || !sem || !lectHrs || !labHrs) {
+			return res.status(400).json({
+				success: false,
+				message: "Please provide all required fields",
+			});
+		}
+		const year = determineYear(sem);
+		const reqLectLoad = divisions * lectHrs;
+		const reqLabLoad = batches * labHrs;
+		const newCourse = new Course({
+			subject,
+			curriculum,
+			sem,
+			year,
+			lectHrs: parseFloat(lectHrs),
+			labHrs: parseFloat(labHrs),
+			tutHrs: parseFloat(tutHrs) || 0,
+			divisions,
+			batches,
+			reqLectLoad,
+			reqLabLoad,
+			reqTotalLoad: reqLectLoad + reqLabLoad,
+		});
 
-        const savedCourse = await newCourse.save();
-        return res.status(201).json({
-            success: true,
-            message: 'Course added successfully',   
-            data: savedCourse
-        });
-    } catch (error) {
-        console.error('Error adding course:', error);
-        return res.status(500).json({
-            success: false,
-            message: `Error adding course: ${error.message}`
-        });
-    }
+		const savedCourse = await newCourse.save();
+		return res.status(201).json({
+			success: true,
+			message: "Course added successfully",
+			data: savedCourse,
+		});
+	} catch (error) {
+		console.error("Error adding course:", error);
+		return res.status(500).json({
+			success: false,
+			message: `Error adding course: ${error.message}`,
+		});
+	}
 };
 
+const editCourse = async (req, res) => {
+	try {
+		const { id } = req.params;
+		const { subject, curriculum, sem, year, divisions, batches } = req.body;
+
+		if (!id) {
+			return res.status(400).json({
+				success: false,
+				message: "Please provide all required fields",
+			});
+		}
+
+		const course = await Course.findById(id);
+		if (!course) {
+			return res.status(404).json({
+				success: false,
+				message: "Course not found",
+			});
+		}
+
+		course.subject = subject ? subject.trim() : course.subject;
+		course.curriculum = curriculum ? curriculum.trim() : course.curriculum;
+		course.sem = sem ? sem.trim() : course.sem;
+		course.year = year ? year.trim() : course.year;
+
+		// if the admin is trying to change the divisions or batches
+		// divisions and batches should not be less than the number of divisions/ batches already assigned
+		let alreadyAssignedDivisions = (course.totalLectLoad - course.reqLectLoad) / course.lectHrs;
+		let alreadyAssignedBatches = (course.totalLabLoad - course.reqLabLoad) / course.labHrs;
+
+        console.log(
+            `Already assigned divisions: ${alreadyAssignedDivisions}, batches: ${alreadyAssignedBatches}`)
+		if (divisions !== undefined) {
+			if (divisions < alreadyAssignedDivisions) {
+				return res.status(400).json({
+					success: false,
+					message: `Divisions should be at least ${alreadyAssignedDivisions}. Delete the assignments first if you want to change this value.`,
+				});
+			}
+			course.divisions = divisions;
+			course.totalLectLoad = divisions * course.lectHrs;
+			course.reqLectLoad = divisions * course.lectHrs - alreadyAssignedDivisions * course.lectHrs;
+		}
+
+		if (batches !== undefined) {
+			if (batches < alreadyAssignedBatches) {
+				return res.status(400).json({
+					success: false,
+					message: `Batches should be at least ${alreadyAssignedBatches}. Delete the assignments first if you want to change this value.`,
+				});
+			}
+			course.batches = batches;
+			course.reqLabLoad = batches * course.labHrs - alreadyAssignedBatches * course.labHrs;
+			course.totalLabLoad = course.reqLabLoad;
+		}
+
+		course.reqTotalLoad = course.reqLectLoad + course.reqLabLoad;
+		course.totalLoad = course.reqTotalLoad;
+
+		await course.save();
+		return res.status(200).json({
+			success: true,
+			message: "Course edited successfully",
+			data: await Course.find({}),
+		});
+	} catch (e) {
+		console.error("Error editing course:", e);
+		return res.status(500).json({
+			success: false,
+			message: `Error editing course: ${e.message}`,
+		});
+	}
+};
 module.exports = {
-    importCourses,
-    getCourses,
-    addCourse
+	importCourses,
+	getCourses,
+	addCourse,
+	editCourse,
 };
