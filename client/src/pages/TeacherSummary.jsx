@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, User, Calendar, BookOpen, Clock, CircleCheck, AlertCircle, ChevronDown, ChevronUp, Search, Filter, Download, ArrowLeft, Edit } from 'lucide-react';
+import { Users, User, Calendar, BookOpen, Clock, CircleCheck, AlertCircle, ChevronDown, ChevronUp, Search, Filter, Download, ArrowLeft, Edit, User2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
@@ -14,6 +14,12 @@ const TeacherSummary = () => {
   const [expandedTeacher, setExpandedTeacher] = useState(null);
   const [editingTeacher, setEditingTeacher] = useState(null);
   const [newLoadLimit, setNewLoadLimit] = useState('');
+  const [newTeacher, setNewTeacher] = useState({
+    name: '',
+    position: '',
+    loadLimit: ''
+  });
+  const [showAddTeacherForm, setShowAddTeacherForm] = useState(false);
   
   const navigate = useNavigate();
 
@@ -72,6 +78,49 @@ const TeacherSummary = () => {
     if (editingTeacher && editingTeacher !== teacherId) {
       setEditingTeacher(null);
       setNewLoadLimit('');
+    }
+  };
+
+
+  const handleAddTeacher = async () => {
+    try{
+      if (!newTeacher.name || !newTeacher.position || !newTeacher.loadLimit) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      const loadValue = parseFloat(newTeacher.loadLimit);
+      if (isNaN(loadValue) || loadValue < 0) {
+        alert('Please enter a valid load limit');
+        return;
+      }
+
+      const response = await axios.post('/api/teachers/add', {
+        name: newTeacher.name.trim(),
+        position: newTeacher.position.trim(),
+        loadLimit: loadValue,
+      });
+
+
+      if (response.data.success) {
+        const newTeacherData = {
+          ...response.data.data,
+          remainingLoad: loadValue,
+          assignedLoad: 0,
+          assignmentsDetails: []
+        };
+        
+        setTeachers([...teachers, newTeacherData]);
+        setFilteredTeachers([...filteredTeachers, newTeacherData]);
+        setShowAddTeacherForm(false);
+        setNewTeacher({ name: '', position: '', loadLimit: '' });
+      } else {
+        alert('Failed to add teacher: ' + response.data.message);
+      }        
+    } catch (err) {
+      console.error(err.message);
+      console.error('Error adding teacher:', err.response ? err.response.data : err.message);
+      alert('Failed to add teacher. Please try again.');
     }
   };
 
@@ -396,6 +445,14 @@ const TeacherSummary = () => {
             <Download className="h-5 w-5 mr-2" />
             Export to Excel
           </button>
+          <button
+          onClick={() => setShowAddTeacherForm(true)}
+          className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+          >
+            <User2 className="h-5 w-5 mr-2" />
+            Add Teacher
+          </button>
+
         </div>
       </div>
 
@@ -672,6 +729,67 @@ const TeacherSummary = () => {
           </div>
         )}
       </div>
+
+
+      {showAddTeacherForm && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded  -lg shadow-lg w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Add New Teacher</h2>
+            <form className="space-y-4">
+              <div> 
+                <label className="block text-sm font-medium text-gray-700">Name</label>
+                <input
+                  type="text"
+                  value={newTeacher.name}
+                  onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2"
+                  required
+                />
+
+                <label className="block text-sm font-medium text-gray-700 mt-4">Position</label>
+                <input
+                  type="text"
+                  value={newTeacher.position} 
+                  onChange={(e) => setNewTeacher({ ...newTeacher, position: e.target.value })}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm
+  focus:ring-blue-500 focus:border-blue-500 p-2"
+                  required
+                />
+
+                <label className="block text-sm font-medium text-gray-700 mt-4">Load Limit</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={newTeacher.loadLimit}
+                  onChange={(e) => setNewTeacher({ ...newTeacher, loadLimit: e.target.value })}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 p-2"
+                  required
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddTeacherForm(false)} 
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  onClick={handleAddTeacher}
+                >
+                  Add Teacher
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+
+
     </div>
   );
 };

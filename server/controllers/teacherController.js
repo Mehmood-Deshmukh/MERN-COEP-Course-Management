@@ -230,9 +230,49 @@ const updateTeacher = async (req, res) => {
     }
 };
 
+
+const addTeacher = async (req, res) => {
+    try {
+        console.log('Adding new teacher:', req.body);
+        const { name, position, loadLimit } = req.body;
+        
+        if (!name || !loadLimit) {
+            return res.status(400).json({
+                success: false,
+                message: "Name and Load Limit are required",
+                data: null
+            });
+        }
+        
+        const newTeacher = new Teacher({
+            name: name.trim(),
+            position: position ? position.trim() : 'Faculty',
+            loadLimit: parseFloat(loadLimit),
+            status: parseFloat(loadLimit) > 0 ? 'Active' : 'Inactive',
+            remainingLoad: parseFloat(loadLimit)
+        });
+        
+        const savedTeacher = await newTeacher.save();
+        
+        return res.status(201).json({
+            success: true,
+            message: "Teacher added successfully",
+            data: savedTeacher
+        });
+    } catch (error) {
+        console.error('Error adding teacher:', error);
+        return res.status(500).json({
+            success: false,
+            message: `Error adding teacher: ${error.message}`,
+            data: null  
+        });
+    }
+};
+
 module.exports = {
 	importTeachers,
 	getTeacher,
 	getTeachers,
-    updateTeacher
+    updateTeacher,
+    addTeacher
 };
