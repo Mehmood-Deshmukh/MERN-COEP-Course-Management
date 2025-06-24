@@ -256,8 +256,9 @@ const editCourse = async (req, res) => {
 
 		// if the admin is trying to change the divisions or batches
 		// divisions and batches should not be less than the number of divisions/ batches already assigned
-		let alreadyAssignedDivisions = (course.totalLectLoad - course.reqLectLoad) / course.lectHrs;
-		let alreadyAssignedBatches = (course.totalLabLoad - course.reqLabLoad) / course.labHrs;
+		let alreadyAssignedDivisions = course.lectHrs === 0 ? 0 : (course.totalLectLoad - course.reqLectLoad) / course.lectHrs;
+		let alreadyAssignedBatches = course.labHrs === 0 ? 0 : (course.totalLabLoad - course.reqLabLoad) / course.labHrs;
+
 
         console.log(
             `Already assigned divisions: ${alreadyAssignedDivisions}, batches: ${alreadyAssignedBatches}`)
@@ -281,6 +282,7 @@ const editCourse = async (req, res) => {
 				});
 			}
 			course.batches = batches;
+            console.log(`Batches: ${batches}, Lab Hrs: ${course.labHrs}, Already assigned batches: ${alreadyAssignedBatches}`);
 			course.reqLabLoad = batches * course.labHrs - alreadyAssignedBatches * course.labHrs;
 			course.totalLabLoad = course.reqLabLoad;
 		}
